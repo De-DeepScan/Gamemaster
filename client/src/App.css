@@ -7,7 +7,9 @@
 }
 
 .header {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: var(--space-2xl);
 }
 
@@ -22,28 +24,161 @@
   text-shadow: 0 0 20px var(--color-primary-glow-medium);
 }
 
-.subtitle {
+/* === CONNECTION BADGE === */
+.connection-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  border: 1px solid;
+  border-radius: var(--border-radius-sm);
+}
+
+.connection-badge.online {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.connection-badge.offline {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.connection-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* === GAME TABS === */
+.game-tabs {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xl);
+  border-bottom: 1px solid rgba(0, 255, 255, 0.15);
+  padding-bottom: var(--space-sm);
+}
+
+.game-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
   font-family: var(--font-primary);
   font-size: var(--text-sm);
   text-transform: uppercase;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   color: var(--color-text-muted);
-  margin-top: var(--space-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  cursor: pointer;
+  transition: all var(--duration-fast) ease;
+}
+
+.game-tab:hover {
+  color: var(--color-text-secondary);
+  background: rgba(0, 255, 255, 0.03);
+}
+
+.game-tab.active {
+  color: var(--color-primary);
+  border-color: rgba(0, 255, 255, 0.3);
+  background: rgba(0, 255, 255, 0.05);
+}
+
+.tab-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+}
+
+.tab-name {
+  font-weight: 600;
+}
+
+.tab-count {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* === INSTANCES BAR === */
+.instances-bar {
+  display: flex;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-xl);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-bg-surface);
+  border: 1px solid rgba(0, 255, 255, 0.1);
+}
+
+.instance-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+}
+
+.instance-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+}
+
+.instance-dot.connected {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.instance-role {
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.instance-state {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* === GAME PANEL === */
+.game-panel {
+  width: 100%;
+  max-width: 700px;
 }
 
 /* === CONTROLS SECTION === */
 .controls {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding-top: var(--space-xl);
 }
 
 .button-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: var(--space-xl);
-  max-width: 600px;
   width: 100%;
 }
 
@@ -65,6 +200,7 @@
 
   cursor: pointer;
   transition: all var(--duration-fast) ease;
+  overflow: hidden;
 }
 
 .control-btn:hover:not(:disabled) {
@@ -88,6 +224,7 @@
   text-transform: uppercase;
   letter-spacing: 2px;
   color: var(--color-primary);
+  transition: all var(--duration-fast) ease;
 }
 
 .btn-description {
@@ -97,9 +234,55 @@
   letter-spacing: 1px;
 }
 
+/* === BUTTON STATUS FEEDBACK === */
+.control-btn.loading {
+  animation: border-pulse 0.8s ease-in-out infinite;
+}
+
+.control-btn.loading .btn-label {
+  opacity: 0.7;
+}
+
+@keyframes border-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.control-btn.success {
+  background: rgba(34, 197, 94, 0.15) !important;
+  border-color: #22c55e !important;
+  box-shadow: 0 0 25px rgba(34, 197, 94, 0.3), inset 0 0 30px rgba(34, 197, 94, 0.1) !important;
+  animation: flash-success 1.5s ease-out forwards;
+}
+
+.control-btn.success .btn-label {
+  color: #22c55e !important;
+}
+
+@keyframes flash-success {
+  0% { background: rgba(34, 197, 94, 0.3); }
+  100% { background: rgba(34, 197, 94, 0.05); }
+}
+
+.control-btn.error {
+  background: rgba(255, 0, 0, 0.15) !important;
+  border-color: var(--color-danger) !important;
+  box-shadow: 0 0 25px var(--color-danger-glow), inset 0 0 30px rgba(255, 0, 0, 0.1) !important;
+  animation: flash-error 2.5s ease-out forwards;
+}
+
+.control-btn.error .btn-label {
+  color: var(--color-danger) !important;
+}
+
+@keyframes flash-error {
+  0%, 10%, 20% { background: rgba(255, 0, 0, 0.25); }
+  5%, 15% { background: rgba(255, 0, 0, 0.1); }
+  100% { background: rgba(255, 0, 0, 0.05); }
+}
+
 /* === BUTTON VARIANTS === */
 
-/* Primary (blue/cyan) - Enable AI */
 .control-btn.primary {
   border-color: var(--color-primary);
 }
@@ -113,21 +296,19 @@
   box-shadow: var(--shadow-glow-medium);
 }
 
-/* Success (green) - Start */
-.control-btn.success {
+.control-btn.success:not(.loading):not([class*="error"]) {
   border-color: #22c55e;
 }
 
-.control-btn.success .btn-label {
+.control-btn.success:not(.loading):not([class*="error"]) .btn-label {
   color: #22c55e;
 }
 
-.control-btn.success:hover:not(:disabled) {
+.control-btn.success:not(.loading):not([class*="error"]):hover:not(:disabled) {
   background: rgba(34, 197, 94, 0.1);
   box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
 }
 
-/* Danger (red) - Reset */
 .control-btn.danger {
   border-color: var(--color-danger);
 }
@@ -141,7 +322,6 @@
   box-shadow: var(--shadow-evil-medium);
 }
 
-/* Warning (orange) - Disable AI */
 .control-btn.warning {
   border-color: #f59e0b;
 }
@@ -155,59 +335,126 @@
   box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
 }
 
-/* === STATUS INDICATORS === */
-.spinner {
-  position: absolute;
-  top: var(--space-md);
-  right: var(--space-md);
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--color-text-muted);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.check,
-.error-icon {
-  position: absolute;
-  top: var(--space-md);
-  right: var(--space-md);
-  font-size: var(--text-lg);
-  font-weight: bold;
-}
-
-.check {
-  color: #22c55e;
-  text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
-}
-
-.error-icon {
-  color: var(--color-danger);
-  text-shadow: 0 0 10px var(--color-danger-glow);
-}
-
-/* === STATUS BAR === */
-.status-bar {
+/* === EMPTY STATE === */
+.empty-state {
   text-align: center;
-  padding: var(--space-lg);
+  padding: var(--space-2xl);
+}
+
+.empty-title {
+  font-family: var(--font-primary);
+  font-size: var(--text-lg);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  margin: 0 0 var(--space-sm);
+}
+
+.empty-hint {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+/* === PER-INSTANCE CONTROLS === */
+.per-instance {
+  margin-top: var(--space-2xl);
+  border-top: 1px solid rgba(0, 255, 255, 0.1);
+  padding-top: var(--space-xl);
+}
+
+.section-label {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--color-primary);
+  margin: 0 0 var(--space-lg);
+}
+
+.instance-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-bg-surface);
+  border: 1px solid rgba(0, 255, 255, 0.08);
+}
+
+.instance-label {
   font-family: var(--font-primary);
   font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 2px;
-  color: var(--color-text-muted);
-  margin-top: var(--space-2xl);
-  border-top: 1px solid rgba(0, 255, 255, 0.1);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  min-width: 100px;
 }
 
-.status-bar strong {
+.instance-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.instance-btn {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: var(--space-xs) var(--space-md);
+  background: var(--color-bg-elevated);
+  border: 1px solid;
+  cursor: pointer;
+  transition: all var(--duration-fast) ease;
+}
+
+.instance-btn.primary {
   color: var(--color-primary);
+  border-color: rgba(0, 255, 255, 0.3);
+}
+
+.instance-btn.success {
+  color: #22c55e;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.instance-btn.danger {
+  color: var(--color-danger);
+  border-color: rgba(255, 0, 0, 0.3);
+}
+
+.instance-btn.warning {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.instance-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.instance-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* Instance button status feedback */
+.instance-btn.loading {
+  animation: border-pulse 0.8s ease-in-out infinite;
+}
+
+.instance-btn.success[class*="success"] {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: #22c55e;
+}
+
+.instance-btn.error {
+  background: rgba(255, 0, 0, 0.15);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 
 /* === RESPONSIVE === */
@@ -216,9 +463,19 @@
     padding: var(--space-lg);
   }
 
+  .header {
+    flex-direction: column;
+    gap: var(--space-sm);
+    text-align: center;
+  }
+
   .header h1 {
     font-size: 1.5rem;
     letter-spacing: 0.3em;
+  }
+
+  .game-tabs {
+    flex-wrap: wrap;
   }
 
   .button-grid {
@@ -229,5 +486,10 @@
   .control-btn {
     min-height: 120px;
     padding: var(--space-lg);
+  }
+
+  .instance-controls {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
