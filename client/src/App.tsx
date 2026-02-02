@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { io } from "socket.io-client";
 import "./App.css";
+// Import the new Voice Cloner Component
+import VoiceCloner from "./VoiceCloner";
 
 const API_URL = "http://localhost:3000";
 const socket = io(API_URL);
@@ -30,7 +32,6 @@ interface GameGroup {
 function groupGames(games: ConnectedGame[]): GameGroup[] {
   const groups = new Map<string, ConnectedGame[]>();
   for (const game of games) {
-    // gameId is "labyrinthe:explorer" or "labyrinthe" — group by base
     const baseId = game.gameId.split(":")[0];
     const list = groups.get(baseId) ?? [];
     list.push(game);
@@ -81,15 +82,17 @@ function App() {
 
   const groups = useMemo(() => groupGames(games), [games]);
 
-  // Auto-select first tab
+  // Auto-select first tab (but don't override Voice Cloner if selected)
   useEffect(() => {
+    if (activeTab === "voice_cloner") return;
+
     if (
       groups.length > 0 &&
       (!activeTab || !groups.find((g) => g.baseId === activeTab))
     ) {
       setActiveTab(groups[0].baseId);
     }
-    if (groups.length === 0) {
+    if (groups.length === 0 && activeTab !== "voice_cloner") {
       setActiveTab(null);
     }
   }, [groups, activeTab]);
@@ -145,35 +148,49 @@ function App() {
       </header>
 
       {/* Tabs */}
-      {groups.length > 0 && (
-        <nav className="game-tabs">
-          {groups.map((group) => (
-            <button
-              key={group.baseId}
-              className={`game-tab ${activeTab === group.baseId ? "active" : ""}`}
-              onClick={() => setActiveTab(group.baseId)}
-            >
-              <span className="tab-dot" />
-              <span className="tab-name">
-                {group.instances[0]?.name.replace(/\s*-\s.*$/, "") ??
-                  group.baseId}
-              </span>
-              <span className="tab-count">
-                {group.instances.length} instance
-                {group.instances.length > 1 ? "s" : ""}
-              </span>
-            </button>
-          ))}
-        </nav>
-      )}
+      <nav className="game-tabs">
+        {groups.map((group) => (
+          <button
+            key={group.baseId}
+            className={`game-tab ${activeTab === group.baseId ? "active" : ""}`}
+            onClick={() => setActiveTab(group.baseId)}
+          >
+            <span className="tab-dot" />
+            <span className="tab-name">
+              {group.instances[0]?.name.replace(/\s*-\s.*$/, "") ??
+                group.baseId}
+            </span>
+            <span className="tab-count">
+              {group.instances.length} instance
+              {group.instances.length > 1 ? "s" : ""}
+            </span>
+          </button>
+        ))}
+
+        {/* STATIC VOICE CLONER TAB */}
+        <button
+          className={`game-tab ${activeTab === "voice_cloner" ? "active" : ""}`}
+          onClick={() => setActiveTab("voice_cloner")}
+        >
+          <span
+            className="tab-dot"
+            style={{ background: "#00ffff", boxShadow: "0 0 6px cyan" }}
+          />
+          <span className="tab-name">IA Voice Cloner</span>
+        </button>
+      </nav>
 
       <main className="controls">
-        {games.length === 0 ? (
+        {/* VIEW 1: VOICE CLONER */}
+        {activeTab === "voice_cloner" ? (
+          <VoiceCloner />
+        ) : games.length === 0 ? (
           <div className="empty-state">
             <p className="empty-title">Aucun mini-jeu connecté</p>
             <p className="empty-hint">En attente des connexions...</p>
           </div>
         ) : activeGroup ? (
+          /* VIEW 2: GAME CONTROLS (Existing) */
           <div className="game-panel">
             {/* Instances status */}
             <div className="instances-bar">
