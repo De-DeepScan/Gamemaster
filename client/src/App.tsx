@@ -16,6 +16,7 @@ interface GameAction {
 interface ConnectedGame {
   socketId: string;
   gameId: string;
+  role?: string;
   name: string;
   availableActions: GameAction[];
   state: Record<string, unknown>;
@@ -29,8 +30,8 @@ interface GameGroup {
 function groupGames(games: ConnectedGame[]): GameGroup[] {
   const groups = new Map<string, ConnectedGame[]>();
   for (const game of games) {
-    // Group by base game id (e.g. "labyrinthe-explorer" → "labyrinthe")
-    const baseId = game.gameId.replace(/-(explorer|protector)$/, "");
+    // gameId is "labyrinthe:explorer" or "labyrinthe" — group by base
+    const baseId = game.gameId.split(":")[0];
     const list = groups.get(baseId) ?? [];
     list.push(game);
     groups.set(baseId, list);
@@ -46,6 +47,13 @@ function getVariant(actionId: string): string {
   if (actionId === "start") return "success";
   if (actionId === "disable_ai") return "warning";
   return "primary";
+}
+
+function getRoleName(game: ConnectedGame): string {
+  if (game.role === "explorer") return "Explorateur";
+  if (game.role === "protector") return "Protecteur";
+  if (game.role) return game.role;
+  return game.name;
 }
 
 function App() {
@@ -147,7 +155,7 @@ function App() {
             >
               <span className="tab-dot" />
               <span className="tab-name">
-                {group.instances[0]?.name.replace(/\s*\(.*\)$/, "") ??
+                {group.instances[0]?.name.replace(/\s*-\s.*$/, "") ??
                   group.baseId}
               </span>
               <span className="tab-count">
@@ -163,39 +171,29 @@ function App() {
         {games.length === 0 ? (
           <div className="empty-state">
             <p className="empty-title">Aucun mini-jeu connecté</p>
-            <p className="empty-hint">
-              En attente de connexions sur {API_URL}...
-            </p>
+            <p className="empty-hint">En attente des connexions...</p>
           </div>
         ) : activeGroup ? (
           <div className="game-panel">
             {/* Instances status */}
             <div className="instances-bar">
-              {activeGroup.instances.map((inst) => {
-                const roleName = inst.gameId.includes("-explorer")
-                  ? "Explorer"
-                  : inst.gameId.includes("-protector")
-                    ? "Protecteur"
-                    : inst.gameId;
-                return (
-                  <div key={inst.gameId} className="instance-badge">
-                    <span className="instance-dot connected" />
-                    <span className="instance-role">{roleName}</span>
-                    {inst.state.role && (
-                      <span className="instance-state">
-                        {inst.state.gameStarted ? "En jeu" : "En attente"}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+              {activeGroup.instances.map((inst) => (
+                <div key={inst.gameId} className="instance-badge">
+                  <span className="instance-dot connected" />
+                  <span className="instance-role">{getRoleName(inst)}</span>
+                  {inst.state.role ? (
+                    <span className="instance-state">
+                      {inst.state.gameStarted ? "En jeu" : "En attente"}
+                    </span>
+                  ) : null}
+                </div>
+              ))}
             </div>
 
             {/* Actions — send to all */}
             {activeGroup.instances.length > 0 && (
               <div className="button-grid">
                 {activeGroup.instances[0].availableActions.map((action) => {
-                  // Check if all instances are loading/success/error for this action
                   const allStatuses = activeGroup.instances.map((inst) =>
                     getStatus(inst.gameId, action.id)
                   );
@@ -235,35 +233,26 @@ function App() {
             {activeGroup.instances.length > 1 && (
               <div className="per-instance">
                 <p className="section-label"># Par instance</p>
-                {activeGroup.instances.map((inst) => {
-                  const roleName = inst.gameId.includes("-explorer")
-                    ? "Explorer"
-                    : inst.gameId.includes("-protector")
-                      ? "Protecteur"
-                      : inst.gameId;
-                  return (
-                    <div key={inst.gameId} className="instance-controls">
-                      <span className="instance-label">{roleName}</span>
-                      <div className="instance-actions">
-                        {inst.availableActions.map((action) => {
-                          const status = getStatus(inst.gameId, action.id);
-                          return (
-                            <button
-                              key={action.id}
-                              className={`instance-btn ${getVariant(action.id)} ${status}`}
-                              onClick={() =>
-                                sendCommand(inst.gameId, action.id)
-                              }
-                              disabled={status === "loading"}
-                            >
-                              {status === "loading" ? "..." : action.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                {activeGroup.instances.map((inst) => (
+                  <div key={inst.gameId} className="instance-controls">
+                    <span className="instance-label">{getRoleName(inst)}</span>
+                    <div className="instance-actions">
+                      {inst.availableActions.map((action) => {
+                        const status = getStatus(inst.gameId, action.id);
+                        return (
+                          <button
+                            key={action.id}
+                            className={`instance-btn ${getVariant(action.id)} ${status}`}
+                            onClick={() => sendCommand(inst.gameId, action.id)}
+                            disabled={status === "loading"}
+                          >
+                            {status === "loading" ? "..." : action.label}
+                          </button>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )}
           </div>

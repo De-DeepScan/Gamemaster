@@ -9,12 +9,18 @@ interface GameAction {
 interface ConnectedGame {
   socketId: string;
   gameId: string;
+  role?: string | undefined;
   name: string;
   availableActions: GameAction[];
   state: Record<string, unknown>;
 }
 
+// Key = "gameId:role" or "gameId" if no role
 const connectedGames = new Map<string, ConnectedGame>();
+
+function gameKey(gameId: string, role?: string): string {
+  return role ? `${gameId}:${role}` : gameId;
+}
 
 export function getConnectedGames(): ConnectedGame[] {
   return [...connectedGames.values()];
@@ -42,17 +48,20 @@ export function setupGamemaster(io: Server): void {
         gameId: string;
         name: string;
         availableActions?: GameAction[];
+        role?: string;
       }) => {
+        const key = gameKey(data.gameId, data.role);
         const game: ConnectedGame = {
           socketId: socket.id,
-          gameId: data.gameId,
+          gameId: key,
+          role: data.role,
           name: data.name,
           availableActions: data.availableActions ?? [],
           state: {},
         };
-        connectedGames.set(data.gameId, game);
+        connectedGames.set(key, game);
         console.log(
-          `[register] ${data.name} (${data.gameId}) — actions: ${game.availableActions.map((a) => a.id).join(", ")}`
+          `[register] ${data.name} (${key}) — actions: ${game.availableActions.map((a) => a.id).join(", ")}`
         );
         io.emit("games_updated", getConnectedGames());
       }
