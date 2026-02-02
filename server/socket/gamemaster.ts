@@ -90,6 +90,10 @@ export function setupGamemaster(io: Server): void {
       }
     );
 
+    socket.on("game-message", (message: unknown) => {
+      socket.broadcast.emit("game-message", message);
+    });
+
     socket.on("disconnect", () => {
       const game = [...connectedGames.values()].find(
         (g) => g.socketId === socket.id

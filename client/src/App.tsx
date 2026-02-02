@@ -175,86 +175,119 @@ function App() {
           </div>
         ) : activeGroup ? (
           <div className="game-panel">
-            {/* Instances status */}
+            {/* Instances status — prominent role cards */}
             <div className="instances-bar">
-              {activeGroup.instances.map((inst) => (
-                <div key={inst.gameId} className="instance-badge">
-                  <span className="instance-dot connected" />
-                  <span className="instance-role">{getRoleName(inst)}</span>
-                  {inst.state.role ? (
+              {activeGroup.instances
+                .filter((inst) => inst.role)
+                .map((inst) => (
+                  <div
+                    key={inst.gameId}
+                    className={`instance-card ${inst.role ?? ""}`}
+                  >
+                    <span className="instance-dot connected" />
+                    <span className="instance-role">{getRoleName(inst)}</span>
                     <span className="instance-state">
-                      {inst.state.gameStarted ? "En jeu" : "En attente"}
+                      {inst.state.gameStarted ? "En jeu" : "Connecté"}
                     </span>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-
-            {/* Actions — send to all */}
-            {activeGroup.instances.length > 0 && (
-              <div className="button-grid">
-                {activeGroup.instances[0].availableActions.map((action) => {
-                  const allStatuses = activeGroup.instances.map((inst) =>
-                    getStatus(inst.gameId, action.id)
-                  );
-                  const isLoading = allStatuses.some((s) => s === "loading");
-                  const isSuccess = allStatuses.every((s) => s === "success");
-                  const isError = allStatuses.some((s) => s === "error");
-
-                  let btnStatus: ActionStatus = "idle";
-                  if (isLoading) btnStatus = "loading";
-                  else if (isSuccess) btnStatus = "success";
-                  else if (isError) btnStatus = "error";
-
-                  return (
-                    <button
-                      key={action.id}
-                      className={`control-btn ${getVariant(action.id)} ${btnStatus}`}
-                      onClick={() =>
-                        sendToAll(activeGroup.instances, action.id)
-                      }
-                      disabled={isLoading}
-                    >
-                      <span className="btn-label">
-                        {isLoading ? "Envoi..." : action.label}
-                      </span>
-                      <span className="btn-description">
-                        {activeGroup.instances.length > 1
-                          ? "Toutes les instances"
-                          : ""}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Per-instance controls if multiple instances */}
-            {activeGroup.instances.length > 1 && (
-              <div className="per-instance">
-                <p className="section-label"># Par instance</p>
-                {activeGroup.instances.map((inst) => (
-                  <div key={inst.gameId} className="instance-controls">
-                    <span className="instance-label">{getRoleName(inst)}</span>
-                    <div className="instance-actions">
-                      {inst.availableActions.map((action) => {
-                        const status = getStatus(inst.gameId, action.id);
-                        return (
-                          <button
-                            key={action.id}
-                            className={`instance-btn ${getVariant(action.id)} ${status}`}
-                            onClick={() => sendCommand(inst.gameId, action.id)}
-                            disabled={status === "loading"}
-                          >
-                            {status === "loading" ? "..." : action.label}
-                          </button>
-                        );
-                      })}
-                    </div>
                   </div>
                 ))}
+              {/* Show disconnected roles if only one instance */}
+              {activeGroup.instances.length === 1 &&
+                activeGroup.instances[0].role && (
+                  <div
+                    className={`instance-card ${activeGroup.instances[0].role === "explorer" ? "protector" : "explorer"} disconnected`}
+                  >
+                    <span className="instance-dot" />
+                    <span className="instance-role">
+                      {activeGroup.instances[0].role === "explorer"
+                        ? "Protecteur"
+                        : "Explorateur"}
+                    </span>
+                    <span className="instance-state">Déconnecté</span>
+                  </div>
+                )}
+              {/* Non-role instances */}
+              {activeGroup.instances
+                .filter((inst) => !inst.role)
+                .map((inst) => (
+                  <div key={inst.gameId} className="instance-card">
+                    <span className="instance-dot connected" />
+                    <span className="instance-role">{inst.name}</span>
+                    <span className="instance-state">
+                      {inst.state.gameStarted ? "En jeu" : "Connecté"}
+                    </span>
+                  </div>
+                ))}
+            </div>
+
+            {/* Shared actions — everything except reset */}
+            {activeGroup.instances.length > 0 && (
+              <div className="button-grid">
+                {activeGroup.instances[0].availableActions
+                  .filter((a) => a.id !== "reset")
+                  .map((action) => {
+                    const allStatuses = activeGroup.instances.map((inst) =>
+                      getStatus(inst.gameId, action.id)
+                    );
+                    const isLoading = allStatuses.some((s) => s === "loading");
+                    const isSuccess = allStatuses.every((s) => s === "success");
+                    const isError = allStatuses.some((s) => s === "error");
+
+                    let btnStatus: ActionStatus = "idle";
+                    if (isLoading) btnStatus = "loading";
+                    else if (isSuccess) btnStatus = "success";
+                    else if (isError) btnStatus = "error";
+
+                    return (
+                      <button
+                        key={action.id}
+                        className={`control-btn ${getVariant(action.id)} ${btnStatus}`}
+                        onClick={() =>
+                          sendToAll(activeGroup.instances, action.id)
+                        }
+                        disabled={isLoading}
+                      >
+                        <span className="btn-label">
+                          {isLoading ? "Envoi..." : action.label}
+                        </span>
+                      </button>
+                    );
+                  })}
               </div>
             )}
+
+            {/* Per-instance reset only, if multiple instances */}
+            {activeGroup.instances.length > 1 &&
+              activeGroup.instances[0].availableActions.some(
+                (a) => a.id === "reset"
+              ) && (
+                <div className="per-instance">
+                  <p className="section-label"># Réinitialiser par rôle</p>
+                  {activeGroup.instances.map((inst) => {
+                    const resetAction = inst.availableActions.find(
+                      (a) => a.id === "reset"
+                    );
+                    if (!resetAction) return null;
+                    const status = getStatus(inst.gameId, "reset");
+                    return (
+                      <div key={inst.gameId} className="instance-controls">
+                        <span className="instance-label">
+                          {getRoleName(inst)}
+                        </span>
+                        <div className="instance-actions">
+                          <button
+                            className={`instance-btn danger ${status}`}
+                            onClick={() => sendCommand(inst.gameId, "reset")}
+                            disabled={status === "loading"}
+                          >
+                            {status === "loading" ? "..." : resetAction.label}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
           </div>
         ) : null}
       </main>
