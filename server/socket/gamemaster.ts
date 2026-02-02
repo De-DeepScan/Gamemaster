@@ -54,6 +54,7 @@ export function setupGamemaster(io: Server): void {
         console.log(
           `[register] ${data.name} (${data.gameId}) — actions: ${game.availableActions.map((a) => a.id).join(", ")}`
         );
+        io.emit("games_updated", getConnectedGames());
       }
     );
 
@@ -64,6 +65,7 @@ export function setupGamemaster(io: Server): void {
       if (!game) return;
       game.state = data.state;
       console.log(`[state] ${game.name}: ${JSON.stringify(data.state)}`);
+      io.emit("games_updated", getConnectedGames());
     });
 
     socket.on(
@@ -86,6 +88,7 @@ export function setupGamemaster(io: Server): void {
       if (game) {
         connectedGames.delete(game.gameId);
         console.log(`[disconnect] ${game.name} (${game.gameId})`);
+        io.emit("games_updated", getConnectedGames());
       }
     });
   });
