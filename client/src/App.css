@@ -805,11 +805,12 @@
 /* Cat Avatar */
 .aria-avatar {
   position: relative;
-  width: 80px;
-  height: 80px;
+  width: 120px;
+  height: 108px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: visible;
 }
 
 .aria-cat-mini {
@@ -817,18 +818,62 @@
   height: 100%;
   color: var(--color-primary);
   filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.4));
-  transition: all var(--duration-fast) ease;
+  transition: color var(--duration-fast) ease;
+  overflow: visible;
 }
 
 .aria-avatar.evil .aria-cat-mini {
   color: var(--color-danger);
   filter: drop-shadow(0 0 12px rgba(255, 0, 0, 0.6));
-  animation: evilPulse 1.5s ease-in-out infinite;
 }
 
+/* Animation du regard gauche-droite */
+@keyframes eyeLookAround {
+  0%, 100% { transform: translateX(0); }
+  20%, 30% { transform: translateX(-8px); }
+  70%, 80% { transform: translateX(8px); }
+}
+
+/* Clignement de l'œil */
+@keyframes eyeBlink {
+  0%, 42%, 48%, 100% { transform: scaleY(1); }
+  45% { transform: scaleY(0.1); }
+}
+
+/* Animation des moustaches */
+@keyframes whiskerTwitch {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(2deg); }
+  75% { transform: rotate(-2deg); }
+}
+
+/* Evil pulse */
 @keyframes evilPulse {
   0%, 100% { filter: drop-shadow(0 0 12px rgba(255, 0, 0, 0.4)); }
   50% { filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.8)); }
+}
+
+.aria-avatar.evil .aria-cat-mini {
+  animation: evilPulse 1.5s ease-in-out infinite;
+}
+
+/* Animations appliquées aux éléments SVG */
+.aria-cat-mini .eye-pupil {
+  animation: eyeLookAround 4s ease-in-out infinite;
+}
+
+.aria-cat-mini .eye-group {
+  transform-origin: 100px 115px;
+  animation: eyeBlink 3.5s ease-in-out infinite;
+}
+
+.aria-cat-mini .whisker {
+  transform-origin: right center;
+  animation: whiskerTwitch 4s ease-in-out infinite;
+}
+
+.aria-cat-mini .whisker:nth-child(odd) {
+  animation-delay: 0.1s;
 }
 
 /* Speaking Indicator */

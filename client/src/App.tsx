@@ -168,7 +168,7 @@ function getFilteredAriaActions(
   });
 }
 
-// ARIA Preview component
+// ARIA Preview component - SVG conforme au Design System
 function AriaPreview({ state }: { state: AriaState }) {
   return (
     <div className={`aria-preview ${state.isEvil ? "evil" : "good"}`}>
@@ -176,37 +176,113 @@ function AriaPreview({ state }: { state: AriaState }) {
         <span className="preview-title">ARIA Status</span>
       </div>
       <div className="aria-preview-content">
-        {/* Cat Avatar */}
+        {/* Cat Avatar - Design System compliant */}
         <div className={`aria-avatar ${state.isEvil ? "evil" : ""}`}>
-          <svg viewBox="0 0 100 90" className="aria-cat-mini">
-            {/* Simplified cat head */}
+          <svg viewBox="0 0 200 180" className="aria-cat-mini">
+            {/* Tête - forme différente selon le mode */}
             <path
               d={
                 state.isEvil
-                  ? "M 20 55 L 10 25 L 30 40 Q 50 30, 70 40 L 90 25 L 80 55 C 85 70, 70 85, 50 85 C 30 85, 15 70, 20 55 Z"
-                  : "M 20 55 L 18 20 L 35 40 Q 50 30, 65 40 L 82 20 L 80 55 C 85 70, 70 85, 50 85 C 30 85, 15 70, 20 55 Z"
+                  ? "M 35 110 L 15 55 L 55 80 Q 100 60, 145 80 L 185 55 L 165 110 C 175 140, 145 175, 100 175 C 55 175, 25 140, 35 110 Z"
+                  : "M 35 110 L 30 35 L 65 75 Q 100 55, 135 75 L 170 35 L 165 110 C 175 140, 145 175, 100 175 C 55 175, 25 140, 35 110 Z"
               }
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="cat-line"
             />
-            {/* Eye */}
-            <ellipse
-              cx="50"
-              cy="55"
-              rx="20"
-              ry="10"
-              fill="none"
+
+            {/* Œil unique central */}
+            <g className="eye-group">
+              <path
+                d={
+                  state.isEvil
+                    ? "M 50 115 Q 65 105, 100 100 Q 135 105, 150 115 Q 135 125, 100 130 Q 65 125, 50 115 Z"
+                    : "M 55 115 Q 65 100, 100 85 Q 135 100, 145 115 Q 135 130, 100 145 Q 65 130, 55 115 Z"
+                }
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Pupille verticale animée */}
+              <line
+                x1="100"
+                y1={state.isEvil ? 103 : 95}
+                x2="100"
+                y2={state.isEvil ? 127 : 135}
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                className="eye-pupil"
+              />
+            </g>
+
+            {/* Moustaches gauche */}
+            <line
+              x1={state.isEvil ? -10 : 0}
+              y1={state.isEvil ? 95 : 100}
+              x2="45"
+              y2="115"
               stroke="currentColor"
               strokeWidth="2"
+              strokeLinecap="round"
+              className="whisker"
             />
             <line
-              x1="50"
-              y1="48"
-              x2="50"
-              y2="62"
+              x1={state.isEvil ? -15 : -5}
+              y1="120"
+              x2="45"
+              y2={state.isEvil ? 120 : 125}
               stroke="currentColor"
               strokeWidth="2"
+              strokeLinecap="round"
+              className="whisker"
+            />
+            <line
+              x1={state.isEvil ? -10 : 0}
+              y1={state.isEvil ? 145 : 140}
+              x2="45"
+              y2="135"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="whisker"
+            />
+
+            {/* Moustaches droite */}
+            <line
+              x1="155"
+              y1="115"
+              x2={state.isEvil ? 210 : 200}
+              y2={state.isEvil ? 95 : 100}
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="whisker"
+            />
+            <line
+              x1="155"
+              y1={state.isEvil ? 120 : 125}
+              x2={state.isEvil ? 215 : 205}
+              y2="120"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="whisker"
+            />
+            <line
+              x1="155"
+              y1="135"
+              x2={state.isEvil ? 210 : 200}
+              y2={state.isEvil ? 145 : 140}
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="whisker"
             />
           </svg>
           {state.isSpeaking && (
