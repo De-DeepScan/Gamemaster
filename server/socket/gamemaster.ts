@@ -151,14 +151,6 @@ export function setupGamemaster(io: Server): void {
       game.status = "connected";
       game.state = data.state;
 
-      // Add detailed logging for sidequest
-      if (key === "sidequest") {
-        console.log(
-          `[sidequest] State update:`,
-          JSON.stringify(data.state, null, 2)
-        );
-      }
-
       console.log(`[state] ${game.name}: ${JSON.stringify(data.state)}`);
       io.emit("games_updated", getConnectedGames());
     });

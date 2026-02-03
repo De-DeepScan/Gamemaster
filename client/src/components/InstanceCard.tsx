@@ -58,22 +58,11 @@ export function InstanceCard({
   // Game state - Sidequest-specific display
   let displayState = "En attente";
   if (instance && expected.gameId === "sidequest") {
-    // Add debug logging
-    console.log("[InstanceCard] Sidequest state:", instance.state);
-
     const currentScreen = instance.state.currentScreen as string;
     const startScreen = instance.state.startScreen as boolean;
     const phase = instance.state.phase as number;
     const score = instance.state.score as number;
     const inProgress = instance.state.in_progress as boolean;
-
-    console.log("[InstanceCard] Parsed values:", {
-      currentScreen,
-      startScreen,
-      phase,
-      score,
-      inProgress,
-    });
 
     if (currentScreen === "lockscreen" && !startScreen) {
       displayState = "Écran noir";
