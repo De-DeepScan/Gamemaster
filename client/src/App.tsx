@@ -182,6 +182,45 @@ function getFilteredAriaActions(
   });
 }
 
+// Filter Sidequest actions based on workflow state
+function getFilteredSidequestActions(
+  actions: GameAction[],
+  sidequestState: Record<string, unknown> | null
+): GameAction[] {
+  if (!sidequestState) return actions;
+
+  const currentScreen = sidequestState.currentScreen as string;
+  const startScreen = sidequestState.startScreen as boolean;
+  const inProgress = sidequestState.in_progress as boolean;
+
+  return actions.filter((action) => {
+    // Reset toujours disponible
+    if (action.id === "reset") return true;
+
+    // LockScreen - écran noir
+    if (currentScreen === "lockscreen" && !startScreen) {
+      return action.id === "start_screen";
+    }
+
+    // LockScreen - formulaire
+    if (currentScreen === "lockscreen" && startScreen) {
+      return action.id === "enter_solution";
+    }
+
+    // Home - transition
+    if (currentScreen === "home") {
+      return false; // Seulement reset (déjà géré)
+    }
+
+    // Game - en cours
+    if (currentScreen === "game" && inProgress) {
+      return ["skip_phase", "add_points", "remove_points"].includes(action.id);
+    }
+
+    return false;
+  });
+}
+
 // ARIA Preview component
 function AriaPreview({ state }: { state: AriaState }) {
   return (
@@ -622,7 +661,12 @@ function App() {
                         activeGroup.instances[0].availableActions,
                         ariaState
                       )
-                    : activeGroup.instances[0].availableActions;
+                    : activeGroup.baseId === "sidequest"
+                      ? getFilteredSidequestActions(
+                          activeGroup.instances[0].availableActions,
+                          activeGroup.instances[0].state
+                        )
+                      : activeGroup.instances[0].availableActions;
 
                 if (allSameActions) {
                   return (

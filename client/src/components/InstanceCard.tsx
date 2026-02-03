@@ -45,11 +45,31 @@ export function InstanceCard({ instance, expected }: InstanceCardProps) {
 
   const { label: statusLabel, className: statusClass } = statusConfig[status];
 
-  // Game state
-  const gameState =
-    instance?.state.gameStarted || instance?.state.in_progress
-      ? "En jeu"
-      : "En attente";
+  // Game state - Sidequest-specific display
+  let displayState = "En attente";
+  if (instance && expected.gameId === "sidequest") {
+    const currentScreen = instance.state.currentScreen as string;
+    const startScreen = instance.state.startScreen as boolean;
+    const phase = instance.state.phase as number;
+    const score = instance.state.score as number;
+    const inProgress = instance.state.in_progress as boolean;
+
+    if (currentScreen === "lockscreen" && !startScreen) {
+      displayState = "Écran noir";
+    } else if (currentScreen === "lockscreen" && startScreen) {
+      displayState = "Écran de connexion";
+    } else if (currentScreen === "home") {
+      displayState = "Transition...";
+    } else if (currentScreen === "game" && inProgress) {
+      displayState = `Phase ${phase}/6 - ${score} pts`;
+    }
+  } else {
+    // Autres jeux
+    displayState =
+      instance?.state.gameStarted || instance?.state.in_progress
+        ? "En jeu"
+        : "En attente";
+  }
 
   // Card classes
   const cardClasses = [
@@ -74,7 +94,7 @@ export function InstanceCard({ instance, expected }: InstanceCardProps) {
           ? "Reconnexion..."
           : status === "not_started"
             ? "Non démarré"
-            : gameState}
+            : displayState}
       </span>
     </div>
   );
