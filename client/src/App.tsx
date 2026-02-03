@@ -66,10 +66,7 @@ const PREDEFINED_GAMES: PredefinedGame[] = [
   {
     baseId: "sidequest",
     displayName: "Sidequest",
-    expectedInstances: [
-      { gameId: "sidequest-computer", name: "Computer" },
-      { gameId: "sidequest-uplink", name: "Uplink" },
-    ],
+    expectedInstances: [{ gameId: "sidequest", name: "Sidequest" }],
   },
   {
     baseId: "aria",
@@ -79,10 +76,7 @@ const PREDEFINED_GAMES: PredefinedGame[] = [
 ];
 
 // Map of gameId prefixes that should be grouped under a single tab
-const GAME_GROUP_PREFIXES: Record<string, string> = {
-  "sidequest-computer": "sidequest",
-  "sidequest-uplink": "sidequest",
-};
+const GAME_GROUP_PREFIXES: Record<string, string> = {};
 
 function groupConnectedGames(
   games: ConnectedGame[]
@@ -322,8 +316,7 @@ function getRoleName(game: ConnectedGame): string {
 
 function getSubGameClass(gameId: string): string {
   const base = gameId.split(":")[0];
-  if (base === "sidequest-computer") return "sidequest-computer";
-  if (base === "sidequest-uplink") return "sidequest-uplink";
+  if (base === "sidequest") return "sidequest";
   return "";
 }
 
@@ -344,6 +337,8 @@ function formatState(
       entries.push({ label: "Phase", value: `${val}/6` });
     else if (key === "in_progress")
       entries.push({ label: "État", value: val ? "En cours" : "En attente" });
+    else if (key === "currentScreen")
+      entries.push({ label: "Écran", value: String(val) });
     else if (key === "aiEnabled")
       entries.push({ label: "IA", value: val ? "Activée" : "Désactivée" });
     else if (key === "gameStarted")
@@ -475,10 +470,8 @@ function App() {
       // Special handling for set_code action
       if (action.id === "set_code") {
         // Check if user is still on computer screen
-        const computerGame = games.find(
-          (g) => g.gameId === "sidequest-computer"
-        );
-        if (computerGame?.state.isPasswordCorrect === true) {
+        const sidequestGame = games.find((g) => g.gameId === "sidequest");
+        if (sidequestGame?.state.isPasswordCorrect === true) {
           toast.warning(
             "Impossible d'entrer le code car l'utilisateur n'est plus sur l'écran du computer"
           );
