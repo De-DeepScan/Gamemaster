@@ -360,6 +360,7 @@ interface ConfirmDialogState {
   action: GameAction | null;
   instances: ConnectedGame[];
   params: Record<string, unknown>;
+  variant?: "warning" | "danger";
 }
 
 function App() {
@@ -563,6 +564,19 @@ function App() {
           action,
           instances,
           params: payload ?? {},
+          variant: "warning",
+        });
+        return;
+      }
+
+      // Special handling for reset action
+      if (action.id === "reset") {
+        setConfirmDialog({
+          isOpen: true,
+          action,
+          instances,
+          params: payload ?? {},
+          variant: "danger",
         });
         return;
       }
@@ -669,68 +683,170 @@ function App() {
                       : activeGroup.instances[0].availableActions;
 
                 if (allSameActions) {
+                  const regularActions = actionsToRender.filter(
+                    (a) => a.id !== "reset"
+                  );
+                  const resetActions = actionsToRender.filter(
+                    (a) => a.id === "reset"
+                  );
+
                   return (
-                    <div className="action-grid">
-                      {actionsToRender.map((action) => {
-                        const allStatuses = activeGroup.instances.map((inst) =>
-                          getStatus(inst.gameId, action.id)
-                        );
-                        const isLoading = allStatuses.some(
-                          (s) => s === "loading"
-                        );
-                        const isSuccess = allStatuses.every(
-                          (s) => s === "success"
-                        );
-                        const isError = allStatuses.some((s) => s === "error");
+                    <>
+                      <div className="action-grid">
+                        {regularActions.map((action) => {
+                          const allStatuses = activeGroup.instances.map(
+                            (inst) => getStatus(inst.gameId, action.id)
+                          );
+                          const isLoading = allStatuses.some(
+                            (s) => s === "loading"
+                          );
+                          const isSuccess = allStatuses.every(
+                            (s) => s === "success"
+                          );
+                          const isError = allStatuses.some(
+                            (s) => s === "error"
+                          );
 
-                        let feedbackStatus: ActionStatus = "idle";
-                        if (isLoading) feedbackStatus = "loading";
-                        else if (isSuccess) feedbackStatus = "success";
-                        else if (isError) feedbackStatus = "error";
+                          let feedbackStatus: ActionStatus = "idle";
+                          if (isLoading) feedbackStatus = "loading";
+                          else if (isSuccess) feedbackStatus = "success";
+                          else if (isError) feedbackStatus = "error";
 
-                        return (
-                          <ActionButton
-                            key={action.id}
-                            action={action}
-                            variant={getVariant(action.id)}
-                            status={feedbackStatus}
-                            onClick={(payload) =>
-                              handleActionClick(
-                                activeGroup.instances,
-                                action,
-                                payload
-                              )
-                            }
-                            disabled={isLoading}
-                          />
-                        );
-                      })}
-                    </div>
+                          return (
+                            <ActionButton
+                              key={action.id}
+                              action={action}
+                              variant={getVariant(action.id)}
+                              status={feedbackStatus}
+                              onClick={(payload) =>
+                                handleActionClick(
+                                  activeGroup.instances,
+                                  action,
+                                  payload
+                                )
+                              }
+                              disabled={isLoading}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      {resetActions.length > 0 && (
+                        <div className="reset-actions-bar">
+                          {resetActions.map((action) => {
+                            const allStatuses = activeGroup.instances.map(
+                              (inst) => getStatus(inst.gameId, action.id)
+                            );
+                            const isLoading = allStatuses.some(
+                              (s) => s === "loading"
+                            );
+                            const isSuccess = allStatuses.every(
+                              (s) => s === "success"
+                            );
+                            const isError = allStatuses.some(
+                              (s) => s === "error"
+                            );
+
+                            let feedbackStatus: ActionStatus = "idle";
+                            if (isLoading) feedbackStatus = "loading";
+                            else if (isSuccess) feedbackStatus = "success";
+                            else if (isError) feedbackStatus = "error";
+
+                            return (
+                              <ActionButton
+                                key={action.id}
+                                action={action}
+                                variant={getVariant(action.id)}
+                                status={feedbackStatus}
+                                onClick={(payload) =>
+                                  handleActionClick(
+                                    activeGroup.instances,
+                                    action,
+                                    payload
+                                  )
+                                }
+                                disabled={isLoading}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
                   );
                 }
 
-                return activeGroup.instances.map((inst) => (
-                  <div key={inst.gameId} className="per-instance">
-                    <p className="section-label">{inst.name}</p>
-                    <div className="action-grid">
-                      {inst.availableActions.map((action) => {
-                        const status = getStatus(inst.gameId, action.id);
-                        return (
-                          <ActionButton
-                            key={action.id}
-                            action={action}
-                            variant={getVariant(action.id)}
-                            status={status}
-                            onClick={(payload) =>
-                              handleActionClick([inst], action, payload)
-                            }
-                            disabled={status === "loading"}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                ));
+                const allResetActions: Array<{
+                  inst: ConnectedGame;
+                  action: GameAction;
+                }> = [];
+
+                const perInstanceElements = activeGroup.instances.map(
+                  (inst) => {
+                    const regularActions = inst.availableActions.filter(
+                      (a) => a.id !== "reset"
+                    );
+                    const resetActions = inst.availableActions.filter(
+                      (a) => a.id === "reset"
+                    );
+
+                    // Collect reset actions for the fixed bar
+                    resetActions.forEach((action) => {
+                      allResetActions.push({ inst, action });
+                    });
+
+                    return (
+                      <div key={inst.gameId} className="per-instance">
+                        <p className="section-label">{inst.name}</p>
+                        <div className="action-grid">
+                          {regularActions.map((action) => {
+                            const status = getStatus(inst.gameId, action.id);
+                            return (
+                              <ActionButton
+                                key={action.id}
+                                action={action}
+                                variant={getVariant(action.id)}
+                                status={status}
+                                onClick={(payload) =>
+                                  handleActionClick([inst], action, payload)
+                                }
+                                disabled={status === "loading"}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+                );
+
+                return (
+                  <>
+                    {perInstanceElements}
+
+                    {allResetActions.length > 0 && (
+                      <div className="reset-actions-bar">
+                        {allResetActions.map(({ inst, action }) => {
+                          const status = getStatus(inst.gameId, action.id);
+                          return (
+                            <ActionButton
+                              key={`${inst.gameId}-${action.id}`}
+                              action={{
+                                ...action,
+                                label: `${action.label} - ${inst.name}`,
+                              }}
+                              variant={getVariant(action.id)}
+                              status={status}
+                              onClick={(payload) =>
+                                handleActionClick([inst], action, payload)
+                              }
+                              disabled={status === "loading"}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                );
               })()}
           </div>
         ) : null}
@@ -738,10 +854,21 @@ function App() {
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
-        title="Attention"
-        message="Cette action va entrer la solution directement dans le jeu. Êtes-vous sûr de vouloir continuer ?"
-        confirmLabel="Confirmer"
+        title={
+          confirmDialog.variant === "danger"
+            ? "Confirmer la réinitialisation"
+            : "Attention"
+        }
+        message={
+          confirmDialog.variant === "danger"
+            ? "Cette action va réinitialiser le jeu. Toute progression sera perdue. Êtes-vous sûr de vouloir continuer ?"
+            : "Cette action va entrer la solution directement dans le jeu. Êtes-vous sûr de vouloir continuer ?"
+        }
+        confirmLabel={
+          confirmDialog.variant === "danger" ? "Réinitialiser" : "Confirmer"
+        }
         cancelLabel="Annuler"
+        variant={confirmDialog.variant}
         onConfirm={handleConfirmAction}
         onCancel={handleCancelAction}
       />
