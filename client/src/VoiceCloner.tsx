@@ -1,35 +1,67 @@
-import { useState, useRef, useEffect, type ChangeEvent } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./VoiceCloner.css";
 
-// Force API URL for this component
-const API_URL = "http://localhost:3000";
+// --- STRICT INTERFACES (No 'any' allowed) ---
+interface Preset {
+  label: string;
+  content: string;
+  file: string;
+}
 
 interface SavedVoice {
   id: string;
   name: string;
 }
 
-const PRESET_TEXTS = [
+interface ElevenLabsVoice {
+  voice_id: string;
+  name: string;
+  // We don't need other properties, but this avoids strict errors
+}
+
+interface VoiceResponse {
+  voices: ElevenLabsVoice[];
+}
+
+interface AddVoiceResponse {
+  voice_id: string;
+}
+
+// --- CONFIGURATION ---
+const PRESET_TEXTS: Preset[] = [
   {
-    label: "Indice 1",
-    content:
-      "Regardez bien sous la table, il y a peut-être quelque chose de caché.",
+    label: "Question Idiot",
+    content: "questions idiot, reponse idiot",
+    file: "Stupid questions.mp3",
   },
   {
-    label: "Alerte Sécurité",
-    content: "Attention. Violation du protocole de sécurité détectée.",
+    label: "Phase 1",
+    content: "oui biensure",
+    file: "phase-1-01-oui-biensure.mp3",
   },
   {
-    label: "Temps Faible",
-    content: "Il ne vous reste que cinq minutes. Faites vite.",
+    label: "par contre",
+    content: "par contre",
+    file: "phase-1-02-par-contre.mp3",
   },
-  { label: "Erreur Code", content: "Code incorrect. Veuillez réessayer." },
-  { label: "Succès", content: "Accès autorisé. Bienvenue dans le système." },
   {
-    label: "Bonjour",
-    content:
-      "Bonjour humains. Je suis l'intelligence artificielle qui contrôle cette pièce.",
+    label: "avec plaisir",
+    content: "avec plaisir",
+    file: "phase-1-03-oui-avec-plaisir.mp3",
   },
+  {
+    label: "presentation",
+    content: "presentation de l'ia",
+    file: "phase-2-presentation-ia.mp3",
+  },
+  { label: "ah oui", content: "ah oui", file: "phase-3-01-ah-oui.mp3" },
+  { label: "merci", content: "merci", file: "phase-3-02-merci.mp3" },
+  {
+    label: "quelques secondes",
+    content: "quelques secondes",
+    file: "phase-3-03-encore-quelqueseconde.mp3",
+  },
+  { label: "phase 4", content: "phase4", file: "phase-4.mp3" },
 ];
 
 function AriaMascot() {
@@ -126,18 +158,33 @@ function AriaMascot() {
 export default function VoiceCloner() {
   const [savedVoices, setSavedVoices] = useState<SavedVoice[]>([]);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [newVoiceName, setNewVoiceName] = useState<string>("");
-  const [status, setStatus] = useState<string>("");
-  const [isRecording, setIsRecording] = useState(false);
-  const [isCloning, setIsCloning] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Custom Text State
   const [customText, setCustomText] = useState("");
+  const [participantName, setParticipantName] = useState("");
+
+  // Status State
+  const [status, setStatus] = useState<string>("");
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
+  // Lock State
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // File Upload State
+  const [file, setFile] = useState<File | null>(null);
+  const [newVoiceName, setNewVoiceName] = useState<string>("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [isCloning, setIsCloning] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+
+  // Init
+  useEffect(() => {
+    const stored = localStorage.getItem("escape_voices");
+    if (stored) setSavedVoices(JSON.parse(stored));
+  }, []);
 
   const ariaVoice = savedVoices.find((v) =>
     v.name.trim().toLowerCase().includes("aria")
@@ -146,143 +193,100 @@ export default function VoiceCloner() {
     (v) => !v.name.trim().toLowerCase().includes("aria")
   );
 
-  useEffect(() => {
-    const stored = localStorage.getItem("escape_voices");
-    if (stored) setSavedVoices(JSON.parse(stored));
-  }, []);
+  // --- LOCAL AUDIO PLAYER ---
+  const playLocalPreset = (filename: string) => {
+    if (isPlaying) return;
 
-  const saveVoicesToStorage = (voices: SavedVoice[]) => {
-    setSavedVoices(voices);
-    localStorage.setItem("escape_voices", JSON.stringify(voices));
+    setAudioUrl(null);
+    setIsPlaying(true);
+
+    const path = `/presets/${filename}`;
+    const audio = new Audio(path);
+
+    audio.onended = () => setIsPlaying(false);
+    audio.onerror = () => {
+      console.error("Local play error");
+      setIsPlaying(false);
+      alert(`Fichier introuvable: ${path}`);
+    };
+
+    audio.play().catch((err) => {
+      console.error("Play prevented:", err);
+      setIsPlaying(false);
+    });
   };
 
-  const deleteVoice = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const updatedList = savedVoices.filter((v) => v.id !== id);
-    saveVoicesToStorage(updatedList);
-    if (selectedVoiceId === id) setSelectedVoiceId(null);
-  };
-
+  // --- API FUNCTIONS ---
   const syncVoices = async () => {
+    const API_KEY = import.meta.env.VITE_ELEVEN_LABS_API_KEY;
+    if (!API_KEY) return setStatus("Erreur: API Key manquante");
     setIsSyncing(true);
-    setStatus("Recherche du système ARIA...");
     try {
-      const res = await fetch(`${API_URL}/api/voices`);
-      const data = await res.json();
-      if (data.voices) {
-        let foundAria = data.voices.find(
-          (v: SavedVoice) => v.name.trim().toLowerCase() === "aria"
-        );
-        if (!foundAria)
-          foundAria = data.voices.find((v: SavedVoice) =>
-            v.name.toLowerCase().includes("aria")
-          );
+      const res = await fetch("https://api.elevenlabs.io/v1/voices", {
+        headers: { "xi-api-key": API_KEY },
+      });
 
-        if (foundAria) {
-          const current = savedVoices.filter(
+      // STRICT TYPING HERE: We tell TS exactly what 'data' is
+      const data = (await res.json()) as VoiceResponse;
+
+      if (data.voices) {
+        // No explicit type needed for 'v' now, TS knows it is ElevenLabsVoice
+        const found = data.voices.find((v) =>
+          v.name.toLowerCase().includes("aria")
+        );
+
+        if (found) {
+          const simple: SavedVoice = { id: found.voice_id, name: found.name };
+          const others = savedVoices.filter(
             (v) => !v.name.toLowerCase().includes("aria")
           );
-          const newList = [...current, foundAria];
-          saveVoicesToStorage(newList);
-          setSelectedVoiceId(foundAria.id);
-          setStatus(`Succès : Système connectée à "${foundAria.name}"`);
-        } else {
-          setStatus("Erreur : Aucune voix nommée 'Aria' trouvée.");
+          const newList = [...others, simple];
+          setSavedVoices(newList);
+          localStorage.setItem("escape_voices", JSON.stringify(newList));
+          setSelectedVoiceId(simple.id);
+          setStatus("Système ARIA connecté.");
         }
-      } else {
-        setStatus("Erreur lors de la récupération.");
       }
     } catch (err) {
       console.error(err);
-      setStatus("Erreur connexion serveur.");
+      setStatus("Erreur Sync.");
     } finally {
       setIsSyncing(false);
     }
   };
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) setFile(e.target.files[0]);
-  };
+  const playText = async (text: string) => {
+    if (isPlaying) return;
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      chunksRef.current = [];
-      mediaRecorderRef.current.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        const recordedFile = new File([blob], "mic-record.webm", {
-          type: "audio/webm",
-        });
-        setFile(recordedFile);
-        setStatus("Enregistrement terminé !");
-        stream.getTracks().forEach((track) => track.stop());
-      };
-      mediaRecorderRef.current.start();
-      setIsRecording(true);
-    } catch (err) {
-      console.error(err);
-      setStatus("Erreur Microphone");
-    }
-  };
+    const API_KEY = import.meta.env.VITE_ELEVEN_LABS_API_KEY;
+    if (!API_KEY) return alert("API Key manquante");
+    if (!selectedVoiceId) return alert("Sélectionnez une voix");
+    if (!text) return;
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
-  const handleClone = async () => {
-    if (!file || !newVoiceName.trim()) return alert("Fichier et Nom requis !");
-    setIsCloning(true);
-    setStatus("Clonage en cours...");
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("name", newVoiceName);
-
-    try {
-      const res = await fetch(`${API_URL}/api/clone`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.success && data.voiceId) {
-        setStatus(`Succès ! Voix "${newVoiceName}" ajoutée.`);
-        const newVoice = { id: data.voiceId, name: newVoiceName };
-        saveVoicesToStorage([...savedVoices, newVoice]);
-        setSelectedVoiceId(data.voiceId);
-        setNewVoiceName("");
-        setFile(null);
-      } else {
-        setStatus("Erreur: " + data.error);
-      }
-    } catch (err) {
-      console.error(err);
-      setStatus("Erreur connexion serveur");
-    } finally {
-      setIsCloning(false);
-    }
-  };
-
-  const playText = async (textToSpeak: string) => {
-    if (!selectedVoiceId) return alert("Sélectionnez une voix !");
-    if (!textToSpeak.trim()) return;
     setAudioUrl(null);
     setIsGenerating(true);
+
     try {
-      const res = await fetch(`${API_URL}/api/tts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: textToSpeak, voiceId: selectedVoiceId }),
-      });
+      const res = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "xi-api-key": API_KEY,
+          },
+          body: JSON.stringify({
+            text,
+            model_id: "eleven_multilingual_v2",
+            voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+          }),
+        }
+      );
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
+        setIsPlaying(true);
       }
     } catch (err) {
       console.error(err);
@@ -291,9 +295,70 @@ export default function VoiceCloner() {
     }
   };
 
+  // --- CLONING LOGIC ---
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mediaRecorderRef.current.ondataavailable = (e) =>
+        chunksRef.current.push(e.data);
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setFile(new File([blob], "rec.webm", { type: "audio/webm" }));
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error(err);
+      setStatus("Erreur Mic");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  };
+
+  const handleClone = async () => {
+    const API_KEY = import.meta.env.VITE_ELEVEN_LABS_API_KEY;
+    if (!API_KEY || !file || !newVoiceName) return alert("Info manquante");
+    setIsCloning(true);
+    const fd = new FormData();
+    fd.append("name", newVoiceName);
+    fd.append("files", file);
+    try {
+      const res = await fetch("https://api.elevenlabs.io/v1/voices/add", {
+        method: "POST",
+        headers: { "xi-api-key": API_KEY },
+        body: fd,
+      });
+
+      // STRICT TYPING HERE TOO
+      const d = (await res.json()) as AddVoiceResponse;
+
+      if (res.ok) {
+        const nv = { id: d.voice_id, name: newVoiceName };
+        const nl = [...savedVoices, nv];
+        setSavedVoices(nl);
+        localStorage.setItem("escape_voices", JSON.stringify(nl));
+        setFile(null);
+        setNewVoiceName("");
+        setStatus("Voix clonée !");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsCloning(false);
+    }
+  };
+
   return (
     <div className="voice-cloner-container">
       <div className="crt-overlay"></div>
+
+      {/* HEADER */}
       <header className="aria-header">
         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
           <div style={{ width: "60px", height: "50px" }}>
@@ -314,6 +379,7 @@ export default function VoiceCloner() {
       </header>
 
       <div className="cloner-grid">
+        {/* LEFT PANEL: VOICES */}
         <div className="panel">
           <div className="panel-header">BASE DE DONNÉES VOCALE</div>
           <div className="scrollable-content">
@@ -323,36 +389,24 @@ export default function VoiceCloner() {
                 className={`voice-item ${selectedVoiceId === ariaVoice.id ? "active" : ""}`}
                 style={{
                   flexDirection: "column",
-                  alignItems: "center",
-                  gap: "10px",
                   textAlign: "center",
+                  alignItems: "center",
                 }}
               >
                 <div style={{ width: "50px", height: "40px" }}>
                   <AriaMascot />
                 </div>
-                <div style={{ fontWeight: "bold", letterSpacing: "2px" }}>
-                  {ariaVoice.name}
-                </div>
-                <div style={{ fontSize: "0.6rem", opacity: 0.7 }}>
-                  SYSTÈME PRINCIPAL
-                </div>
+                <div style={{ fontWeight: "bold" }}>{ariaVoice.name}</div>
+                <div style={{ fontSize: "0.6rem" }}>PRINCIPAL</div>
               </div>
             ) : (
               <div
-                style={{
-                  border: "1px dashed var(--color-aria-primary)",
-                  padding: "15px",
-                  textAlign: "center",
-                  opacity: 0.6,
-                  fontSize: "0.8rem",
-                }}
+                style={{ padding: "20px", textAlign: "center", opacity: 0.5 }}
               >
-                Aria introuvable.
-                <br />
-                Cliquez sur Réinitialiser.
+                Aria non trouvée
               </div>
             )}
+
             <div
               style={{
                 height: "1px",
@@ -361,15 +415,21 @@ export default function VoiceCloner() {
                 opacity: 0.3,
               }}
             ></div>
-            {otherVoices.map((voice) => (
+
+            {otherVoices.map((v) => (
               <div
-                key={voice.id}
-                onClick={() => setSelectedVoiceId(voice.id)}
-                className={`voice-item ${selectedVoiceId === voice.id ? "active" : ""}`}
+                key={v.id}
+                onClick={() => setSelectedVoiceId(v.id)}
+                className={`voice-item ${selectedVoiceId === v.id ? "active" : ""}`}
               >
-                <span>{voice.name}</span>
+                <span>{v.name}</span>
                 <button
-                  onClick={(e) => deleteVoice(voice.id, e)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const nl = savedVoices.filter((i) => i.id !== v.id);
+                    setSavedVoices(nl);
+                    localStorage.setItem("escape_voices", JSON.stringify(nl));
+                  }}
                   style={{
                     background: "none",
                     border: "none",
@@ -384,12 +444,14 @@ export default function VoiceCloner() {
           </div>
         </div>
 
+        {/* RIGHT PANEL: CONTROLS */}
         <div className="panel" style={{ borderRight: "none" }}>
           <div className="panel-header">INTERFACE DE COMMANDE</div>
           <div
             className="scrollable-content"
             style={{ display: "flex", flexDirection: "column", gap: "20px" }}
           >
+            {/* DYNAMIC NAME (Still API) */}
             <div>
               <div
                 style={{
@@ -398,25 +460,62 @@ export default function VoiceCloner() {
                   letterSpacing: "2px",
                 }}
               >
-                MESSAGE PRIORITAIRE
+                PROTOCOLE D'ACCUEIL (API)
+              </div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <input
+                  type="text"
+                  value={participantName}
+                  onChange={(e) => setParticipantName(e.target.value)}
+                  placeholder="Prénom..."
+                  className="input-line"
+                  style={{ flexGrow: 1 }}
+                />
+                <button
+                  onClick={() =>
+                    playText(
+                      `Bonjour ${participantName}, je suis ARIA. Une intelligence artificielle à vos cotés. Pour vous.`
+                    )
+                  }
+                  disabled={isGenerating || isPlaying || !participantName}
+                  className="aria-btn"
+                  style={{ whiteSpace: "nowrap", opacity: isPlaying ? 0.5 : 1 }}
+                >
+                  {isGenerating ? "..." : "► DIRE"}
+                </button>
+              </div>
+            </div>
+
+            {/* MANUAL (Still API) */}
+            <div>
+              <div
+                style={{
+                  fontSize: "0.7rem",
+                  marginBottom: "5px",
+                  letterSpacing: "2px",
+                }}
+              >
+                MESSAGE MANUEL (API)
               </div>
               <div style={{ display: "flex", gap: "10px" }}>
                 <textarea
                   value={customText}
                   onChange={(e) => setCustomText(e.target.value)}
-                  placeholder="Entrez votre message ici..."
                   className="message-box"
+                  placeholder="Message..."
                 />
                 <button
                   onClick={() => playText(customText)}
-                  disabled={isGenerating || !selectedVoiceId || !customText}
+                  disabled={isGenerating || isPlaying || !customText}
                   className="aria-btn"
-                  style={{ height: "auto" }}
+                  style={{ height: "auto", opacity: isPlaying ? 0.5 : 1 }}
                 >
                   {isGenerating ? "..." : "▶"}
                 </button>
               </div>
             </div>
+
+            {/* PRESETS (LOCAL FILE FAILSAFE) */}
             <div>
               <div
                 style={{
@@ -425,7 +524,7 @@ export default function VoiceCloner() {
                   letterSpacing: "2px",
                 }}
               >
-                PROTOCOLES RAPIDES
+                PROTOCOLES RAPIDES (OFFLINE READY)
               </div>
               <div
                 style={{
@@ -437,8 +536,8 @@ export default function VoiceCloner() {
                 {PRESET_TEXTS.map((preset, idx) => (
                   <button
                     key={idx}
-                    onClick={() => playText(preset.content)}
-                    disabled={isGenerating || !selectedVoiceId}
+                    onClick={() => playLocalPreset(preset.file)}
+                    disabled={isPlaying}
                     className="voice-item"
                     style={{
                       width: "100%",
@@ -447,6 +546,8 @@ export default function VoiceCloner() {
                       alignItems: "flex-start",
                       background: "rgba(0,0,0,0.4)",
                       margin: 0,
+                      opacity: isPlaying ? 0.5 : 1,
+                      cursor: isPlaying ? "not-allowed" : "pointer",
                     }}
                   >
                     <span style={{ fontWeight: "bold", color: "#fff" }}>
@@ -458,10 +559,6 @@ export default function VoiceCloner() {
                         opacity: 0.6,
                         marginTop: "5px",
                         fontStyle: "italic",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        width: "100%",
                       }}
                     >
                       "{preset.content}"
@@ -470,6 +567,8 @@ export default function VoiceCloner() {
                 ))}
               </div>
             </div>
+
+            {/* PLAYER (For API Audio) */}
             <div
               style={{
                 borderTop: "1px solid var(--color-aria-primary)",
@@ -477,21 +576,27 @@ export default function VoiceCloner() {
                 minHeight: "40px",
                 display: "flex",
                 justifyContent: "center",
-                alignItems: "center",
               }}
             >
               {isGenerating ? (
                 <span style={{ animation: "blink 0.5s infinite" }}>
-                  TRANSMISSION EN COURS...
+                  TRANSMISSION...
                 </span>
               ) : audioUrl ? (
-                <audio controls src={audioUrl} autoPlay />
+                <audio
+                  controls
+                  src={audioUrl}
+                  autoPlay
+                  onEnded={() => setIsPlaying(false)}
+                  onError={() => setIsPlaying(false)}
+                />
               ) : null}
             </div>
           </div>
         </div>
       </div>
 
+      {/* FOOTER: CLONER */}
       <section className="creator-section">
         <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "10px" }}>
           NOUVELLE ENTRÉE VOCALE
@@ -503,7 +608,7 @@ export default function VoiceCloner() {
               value={newVoiceName}
               onChange={(e) => setNewVoiceName(e.target.value)}
               className="input-line"
-              placeholder="Identifiant..."
+              placeholder="Nom..."
             />
           </div>
           <div>
@@ -515,11 +620,7 @@ export default function VoiceCloner() {
               <button
                 onClick={stopRecording}
                 className="aria-btn"
-                style={{
-                  background: "var(--color-aria-primary)",
-                  color: "#000",
-                  animation: "pulse 1s infinite",
-                }}
+                style={{ background: "cyan", color: "black" }}
               >
                 ⏹ STOP
               </button>
@@ -528,26 +629,27 @@ export default function VoiceCloner() {
           <div style={{ flexGrow: 1 }}>
             <input
               type="file"
-              onChange={handleFileChange}
-              accept="audio/*"
+              onChange={(e) =>
+                setFile(e.target.files ? e.target.files[0] : null)
+              }
               style={{ fontSize: "0.8rem" }}
             />
           </div>
           <button
             onClick={handleClone}
-            disabled={!file || isCloning}
+            disabled={isCloning}
             className="aria-btn"
           >
-            INITIALISER
+            CLONER
           </button>
         </div>
         <div
           style={{
             textAlign: "center",
             fontSize: "0.7rem",
+            color: "yellow",
             marginTop: "5px",
             height: "15px",
-            color: "#ffff00",
           }}
         >
           {status}
