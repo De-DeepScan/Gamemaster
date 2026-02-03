@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audio Player</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #ccc;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      text-align: center;
+      max-width: 500px;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 1.5rem;
+      color: #fff;
+    }
+    #activate-btn {
+      background: #00ffff;
+      color: #000;
+      border: none;
+      padding: 1rem 2.5rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    #activate-btn:hover { background: #00cccc; }
+    #activate-btn:disabled {
+      background: #333;
+      color: #666;
+      cursor: default;
+    }
+    .status {
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #555;
+    }
+    .dot.connected { background: #0f0; box-shadow: 0 0 6px #0f0; }
+    .dot.ready { background: #00ffff; box-shadow: 0 0 6px #00ffff; }
+    #log {
+      margin-top: 2rem;
+      text-align: left;
+      font-size: 0.75rem;
+      color: #666;
+      max-height: 200px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>AUDIO PLAYER</h1>
+    <button id="activate-btn">Activer Audio</button>
+    <div class="status">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">Connexion...</span>
+    </div>
+    <div id="spotify-embed" style="margin-top:1.5rem;"></div>
+    <div id="log"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const btn = document.getElementById("activate-btn");
+    const dot = document.getElementById("status-dot");
+    const statusText = document.getElementById("status-text");
+    const logEl = document.getElementById("log");
+
+    let audioUnlocked = false;
+    let ambientAudios = {};   // soundId -> HTMLAudioElement
+    let presetAudios = {};    // presetIdx -> HTMLAudioElement
+    let ttsAudio = null;
+    let iaVolume = 1;
+    let masterVolume = 1;
+
+    // Master volume via AudioContext GainNode
+    let audioCtx = null;
+    let masterGain = null;
+
+    function initAudioContext() {
+      if (audioCtx) return;
+      audioCtx = new AudioContext();
+      masterGain = audioCtx.createGain();
+      masterGain.connect(audioCtx.destination);
+    }
+
+    function routeThroughMaster(audio) {
+      if (!audioCtx || !masterGain) return;
+      try {
+        const source = audioCtx.createMediaElementSource(audio);
+        source.connect(masterGain);
+      } catch (e) { /* already routed */ }
+    }
+
+    function log(msg) {
+      const line = document.createElement("div");
+      line.textContent = new Date().toLocaleTimeString() + " " + msg;
+      logEl.prepend(line);
+      if (logEl.children.length > 50) logEl.lastChild.remove();
+    }
+
+    socket.on("connect", () => {
+      dot.classList.add("connected");
+      statusText.textContent = "Connecté — en attente d'activation";
+      log("Connecté au serveur");
+    });
+
+    socket.on("disconnect", () => {
+      dot.classList.remove("connected", "ready");
+      statusText.textContent = "Déconnecté";
+      log("Déconnecté");
+    });
+
+    btn.addEventListener("click", () => {
+      initAudioContext();
+      // Unlock audio context with a silent play
+      const buf = audioCtx.createBuffer(1, 1, 22050);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start();
+
+      audioUnlocked = true;
+      btn.disabled = true;
+      btn.textContent = "Audio activé";
+      dot.classList.add("ready");
+      statusText.textContent = "Prêt — en écoute";
+      log("Audio déverrouillé");
+
+      socket.emit("register-audio-player", {});
+    });
+
+    // --- Ambient sounds ---
+    socket.on("audio:play-ambient", (data) => {
+      if (!audioUnlocked) return;
+      const { soundId, file, volume } = data;
+      log("▶ Ambiance: " + soundId);
+
+      if (ambientAudios[soundId]) {
+        ambientAudios[soundId].pause();
+        ambientAudios[soundId].src = "";
+      }
+
+      const audio = new Audio("/sounds/" + file);
+      audio.loop = true;
+      audio.volume = volume ?? 0.5;
+      routeThroughMaster(audio);
+      audio.play().catch((e) => log("Erreur play: " + e.message));
+      ambientAudios[soundId] = audio;
+    });
+
+    socket.on("audio:stop-ambient", (data) => {
+      const { soundId } = data;
+      log("■ Stop ambiance: " + soundId);
+      const audio = ambientAudios[soundId];
+      if (audio) {
+        audio.pause();
+        audio.src = "";
+        delete ambientAudios[soundId];
+      }
+    });
+
+    socket.on("audio:volume-ambient", (data) => {
+      const { soundId, volume } = data;
+      const audio = ambientAudios[soundId];
+      if (audio) audio.volume = volume;
+    });
+
+    // --- Presets ---
+    // Periodic progress reporting
+    setInterval(() => {
+      for (const idx in presetAudios) {
+        const a = presetAudios[idx];
+        if (a && !a.paused && a.duration) {
+          socket.emit("audio:preset-progress", {
+            presetIdx: Number(idx),
+            currentTime: a.currentTime,
+            duration: a.duration,
+          });
+        }
+      }
+    }, 250);
+
+    socket.on("audio:play-preset", (data) => {
+      if (!audioUnlocked) return;
+      const { presetIdx, file } = data;
+
+      const existing = presetAudios[presetIdx];
+      if (existing && existing.src) {
+        // Resume paused audio
+        log("▶ Resume preset: " + presetIdx);
+        existing.volume = iaVolume;
+        existing.play().catch((e) => log("Erreur resume: " + e.message));
+        return;
+      }
+
+      log("▶ Preset: " + file);
+      const audio = new Audio("/presets/" + file);
+      audio.volume = iaVolume;
+      routeThroughMaster(audio);
+      audio.onended = () => {
+        socket.emit("audio:preset-progress", {
+          presetIdx: Number(presetIdx),
+          currentTime: audio.duration,
+          duration: audio.duration,
+          ended: true,
+        });
+        delete presetAudios[presetIdx];
+      };
+      audio.play().catch((e) => log("Erreur preset: " + e.message));
+      presetAudios[presetIdx] = audio;
+    });
+
+    socket.on("audio:pause-preset", (data) => {
+      const { presetIdx } = data;
+      log("⏸ Pause preset: " + presetIdx);
+      const audio = presetAudios[presetIdx];
+      if (audio) audio.pause();
+    });
+
+    socket.on("audio:seek-preset", (data) => {
+      const { presetIdx, time } = data;
+      log("⏩ Seek preset " + presetIdx + " → " + time.toFixed(1) + "s");
+      const audio = presetAudios[presetIdx];
+      if (audio) audio.currentTime = time;
+    });
+
+    socket.on("audio:stop-preset", (data) => {
+      const { presetIdx } = data;
+      log("■ Stop preset: " + presetIdx);
+      const audio = presetAudios[presetIdx];
+      if (audio) {
+        audio.pause();
+        audio.src = "";
+        delete presetAudios[presetIdx];
+      }
+    });
+
+    // --- TTS ---
+    socket.on("audio:play-tts", (data) => {
+      if (!audioUnlocked) return;
+      const { audioBase64, mimeType } = data;
+      log("▶ TTS");
+
+      if (ttsAudio) { ttsAudio.pause(); ttsAudio.src = ""; }
+
+      const binary = atob(audioBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: mimeType || "audio/mpeg" });
+      const url = URL.createObjectURL(blob);
+
+      ttsAudio = new Audio(url);
+      ttsAudio.volume = iaVolume;
+      routeThroughMaster(ttsAudio);
+      ttsAudio.onended = () => { URL.revokeObjectURL(url); ttsAudio = null; };
+      ttsAudio.play().catch((e) => log("Erreur TTS: " + e.message));
+    });
+
+    // --- IA volume ---
+    socket.on("audio:volume-ia", (data) => {
+      iaVolume = data.volume;
+      log("🔊 Volume IA: " + Math.round(iaVolume * 100) + "%");
+      for (const id in presetAudios) {
+        presetAudios[id].volume = iaVolume;
+      }
+      if (ttsAudio) ttsAudio.volume = iaVolume;
+    });
+
+    // --- Stop all ---
+    socket.on("audio:stop-all", () => {
+      log("■ Stop all");
+      for (const id in ambientAudios) {
+        ambientAudios[id].pause();
+        ambientAudios[id].src = "";
+      }
+      ambientAudios = {};
+      for (const id in presetAudios) {
+        presetAudios[id].pause();
+        presetAudios[id].src = "";
+      }
+      presetAudios = {};
+      if (ttsAudio) { ttsAudio.pause(); ttsAudio.src = ""; ttsAudio = null; }
+    });
+
+    // --- Master volume ---
+    socket.on("audio:master-volume", (data) => {
+      masterVolume = data.volume;
+      log("Master volume: " + Math.round(masterVolume * 100) + "%");
+      if (masterGain) masterGain.gain.value = masterVolume;
+    });
+
+    // --- Spotify IFrame API ---
+    let spotifyController = null;
+
+    window.onSpotifyIframeApiReady = (IFrameAPI) => {
+      const el = document.getElementById("spotify-embed");
+      IFrameAPI.createController(el, {
+        uri: "spotify:playlist:7AfNxFxKvpN1jz5y7bvFK1",
+        height: 352,
+        width: "100%",
+      }, (controller) => {
+        spotifyController = controller;
+        log("Spotify embed ready");
+
+        controller.addListener("playback_update", (e) => {
+          socket.emit("spotify:state", {
+            isPaused: e.data.isPaused,
+            position: e.data.position,
+            duration: e.data.duration,
+          });
+        });
+      });
+    };
+
+    socket.on("spotify:toggle", () => {
+      if (!spotifyController) return;
+      log("Spotify: toggle play/pause");
+      spotifyController.togglePlay();
+    });
+  </script>
+  <script src="https://open.spotify.com/embed/iframe-api/v1"></script>
+</body>
+</html>

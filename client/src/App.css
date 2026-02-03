@@ -175,6 +175,34 @@
   padding-top: var(--space-xl);
 }
 
+.controls-full {
+  justify-content: stretch;
+}
+
+/* === SOUND CONTROL 2-COLUMN LAYOUT === */
+.sound-control-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  width: 100%;
+}
+
+.sound-control-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.col-header {
+  font-family: var(--font-primary);
+  font-size: 0.7rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  opacity: 0.5;
+  padding-bottom: var(--space-sm);
+}
+
 .button-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

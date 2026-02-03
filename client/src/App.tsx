@@ -1,11 +1,8 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { io } from "socket.io-client";
 import "./App.css";
-// Import the new Voice Cloner Component
 import VoiceCloner from "./VoiceCloner";
-
-const API_URL = "http://localhost:3000";
-const socket = io(API_URL);
+import SoundPad from "./SoundPad";
+import { socket, API_URL } from "./socket";
 
 type ActionStatus = "idle" | "loading" | "success" | "error";
 
@@ -62,11 +59,15 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, ActionStatus>>({});
+  const [audioPlayerCount, setAudioPlayerCount] = useState(0);
 
   useEffect(() => {
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
     socket.on("games_updated", (data: ConnectedGame[]) => setGames(data));
+    socket.on("audio-players-updated", (data: { count: number }) =>
+      setAudioPlayerCount(data.count)
+    );
 
     fetch(`${API_URL}/api/games`)
       .then((r) => r.json())
@@ -77,12 +78,12 @@ function App() {
       socket.off("connect");
       socket.off("disconnect");
       socket.off("games_updated");
+      socket.off("audio-players-updated");
     };
   }, []);
 
   const groups = useMemo(() => groupGames(games), [games]);
 
-  // Auto-select first tab (but don't override Voice Cloner if selected)
   useEffect(() => {
     if (activeTab === "voice_cloner") return;
 
@@ -145,6 +146,12 @@ function App() {
           <span className="connection-dot" />
           {connected ? "Serveur connecté" : "Serveur déconnecté"}
         </div>
+        <div
+          className={`connection-badge ${audioPlayerCount > 0 ? "online" : "offline"}`}
+        >
+          <span className="connection-dot" />
+          {audioPlayerCount} player{audioPlayerCount !== 1 ? "s" : ""} audio
+        </div>
       </header>
 
       {/* Tabs */}
@@ -167,7 +174,6 @@ function App() {
           </button>
         ))}
 
-        {/* STATIC VOICE CLONER TAB */}
         <button
           className={`game-tab ${activeTab === "voice_cloner" ? "active" : ""}`}
           onClick={() => setActiveTab("voice_cloner")}
@@ -176,23 +182,31 @@ function App() {
             className="tab-dot"
             style={{ background: "#00ffff", boxShadow: "0 0 6px cyan" }}
           />
-          <span className="tab-name">IA Voice Cloner</span>
+          <span className="tab-name">Sound Control</span>
         </button>
       </nav>
 
-      <main className="controls">
-        {/* VIEW 1: VOICE CLONER */}
+      <main
+        className={`controls ${activeTab === "voice_cloner" ? "controls-full" : ""}`}
+      >
         {activeTab === "voice_cloner" ? (
-          <VoiceCloner />
+          <div className="sound-control-layout">
+            <div className="sound-control-col">
+              <div className="col-header">IA</div>
+              <VoiceCloner />
+            </div>
+            <div className="sound-control-col">
+              <div className="col-header">AMBIANCE SONORE</div>
+              <SoundPad />
+            </div>
+          </div>
         ) : games.length === 0 ? (
           <div className="empty-state">
             <p className="empty-title">Aucun mini-jeu connecté</p>
             <p className="empty-hint">En attente des connexions...</p>
           </div>
         ) : activeGroup ? (
-          /* VIEW 2: GAME CONTROLS (Existing) */
           <div className="game-panel">
-            {/* Instances status */}
             <div className="instances-bar">
               {activeGroup.instances.map((inst) => (
                 <div key={inst.gameId} className="instance-badge">
@@ -207,7 +221,6 @@ function App() {
               ))}
             </div>
 
-            {/* Actions — send to all */}
             {activeGroup.instances.length > 0 && (
               <div className="button-grid">
                 {activeGroup.instances[0].availableActions.map((action) => {
@@ -246,7 +259,6 @@ function App() {
               </div>
             )}
 
-            {/* Per-instance controls if multiple instances */}
             {activeGroup.instances.length > 1 && (
               <div className="per-instance">
                 <p className="section-label"># Par instance</p>

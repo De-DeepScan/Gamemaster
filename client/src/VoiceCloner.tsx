@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { socket } from "./socket";
 import "./VoiceCloner.css";
 
-// --- STRICT INTERFACES (No 'any' allowed) ---
 interface Preset {
   label: string;
   content: string;
@@ -16,7 +16,6 @@ interface SavedVoice {
 interface ElevenLabsVoice {
   voice_id: string;
   name: string;
-  // We don't need other properties, but this avoids strict errors
 }
 
 interface VoiceResponse {
@@ -27,7 +26,6 @@ interface AddVoiceResponse {
   voice_id: string;
 }
 
-// --- CONFIGURATION ---
 const PRESET_TEXTS: Preset[] = [
   {
     label: "Question Idiot",
@@ -62,117 +60,43 @@ const PRESET_TEXTS: Preset[] = [
     file: "phase-3-03-encore-quelqueseconde.mp3",
   },
   { label: "phase 4", content: "phase4", file: "phase-4.mp3" },
+  { label: "Finale", content: "finale", file: "finale.mp3" },
 ];
 
-function AriaMascot() {
-  return (
-    <svg
-      viewBox="0 0 200 180"
-      className="aria-cat-svg"
-      style={{ width: "100%", height: "100%" }}
-    >
-      <path
-        d="M 35 110 L 30 35 L 65 75 Q 100 55, 135 75 L 170 35 L 165 110 C 175 140, 145 175, 100 175 C 55 175, 25 140, 35 110 Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <g className="eye-group">
-        <path
-          d="M 55 115 Q 65 100, 100 85 Q 135 100, 145 115 Q 135 130, 100 145 Q 65 130, 55 115 Z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-        />
-        <line
-          x1="100"
-          y1="95"
-          x2="100"
-          y2="135"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-          className="eye-pupil"
-        />
-      </g>
-      <line
-        x1="0"
-        y1="100"
-        x2="45"
-        y2="115"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="whisker"
-      />
-      <line
-        x1="-5"
-        y1="120"
-        x2="45"
-        y2="125"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="whisker"
-      />
-      <line
-        x1="0"
-        y1="140"
-        x2="45"
-        y2="135"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="whisker"
-      />
-      <line
-        x1="155"
-        y1="115"
-        x2="200"
-        y2="100"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="whisker"
-      />
-      <line
-        x1="155"
-        y1="125"
-        x2="205"
-        y2="120"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="whisker"
-      />
-      <line
-        x1="155"
-        y1="135"
-        x2="200"
-        y2="140"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="whisker"
-      />
-    </svg>
-  );
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      resolve(dataUrl.split(",")[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 export default function VoiceCloner() {
   const [savedVoices, setSavedVoices] = useState<SavedVoice[]>([]);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
 
-  // Custom Text State
   const [customText, setCustomText] = useState("");
   const [participantName, setParticipantName] = useState("");
 
-  // Status State
   const [status, setStatus] = useState<string>("");
-  const [isSyncing, setIsSyncing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isApiPlaying, setIsApiPlaying] = useState(false);
 
-  // Lock State
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [iaVolume, setIaVolume] = useState(1);
+  const [presetStates, setPresetStates] = useState<
+    Record<number, { playing: boolean; currentTime: number; duration: number }>
+  >({});
 
-  // File Upload State
   const [file, setFile] = useState<File | null>(null);
   const [newVoiceName, setNewVoiceName] = useState<string>("");
   const [isRecording, setIsRecording] = useState(false);
@@ -180,61 +104,60 @@ export default function VoiceCloner() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  // Init
   useEffect(() => {
     const stored = localStorage.getItem("escape_voices");
-    if (stored) setSavedVoices(JSON.parse(stored));
+    if (stored) {
+      const voices = JSON.parse(stored) as SavedVoice[];
+      setSavedVoices(voices);
+      const aria = voices.find((v) =>
+        v.name.trim().toLowerCase().includes("aria")
+      );
+      if (aria) setSelectedVoiceId(aria.id);
+    }
   }, []);
 
-  const ariaVoice = savedVoices.find((v) =>
-    v.name.trim().toLowerCase().includes("aria")
-  );
-  const otherVoices = savedVoices.filter(
-    (v) => !v.name.trim().toLowerCase().includes("aria")
-  );
-
-  // --- LOCAL AUDIO PLAYER ---
-  const playLocalPreset = (filename: string) => {
-    if (isPlaying) return;
-
-    setAudioUrl(null);
-    setIsPlaying(true);
-
-    const path = `/presets/${filename}`;
-    const audio = new Audio(path);
-
-    audio.onended = () => setIsPlaying(false);
-    audio.onerror = () => {
-      console.error("Local play error");
-      setIsPlaying(false);
-      alert(`Fichier introuvable: ${path}`);
+  useEffect(() => {
+    const onProgress = (data: {
+      presetIdx: number;
+      currentTime: number;
+      duration: number;
+      ended?: boolean;
+    }) => {
+      if (data.ended) {
+        setPresetStates((prev) => {
+          const next = { ...prev };
+          delete next[data.presetIdx];
+          return next;
+        });
+        return;
+      }
+      setPresetStates((prev) => ({
+        ...prev,
+        [data.presetIdx]: {
+          playing: prev[data.presetIdx]?.playing ?? true,
+          currentTime: data.currentTime,
+          duration: data.duration,
+        },
+      }));
     };
+    socket.on("audio:preset-progress", onProgress);
+    return () => {
+      socket.off("audio:preset-progress", onProgress);
+    };
+  }, []);
 
-    audio.play().catch((err) => {
-      console.error("Play prevented:", err);
-      setIsPlaying(false);
-    });
-  };
-
-  // --- API FUNCTIONS ---
   const syncVoices = async () => {
     const API_KEY = import.meta.env.VITE_ELEVEN_LABS_API_KEY;
     if (!API_KEY) return setStatus("Erreur: API Key manquante");
-    setIsSyncing(true);
     try {
       const res = await fetch("https://api.elevenlabs.io/v1/voices", {
         headers: { "xi-api-key": API_KEY },
       });
-
-      // STRICT TYPING HERE: We tell TS exactly what 'data' is
       const data = (await res.json()) as VoiceResponse;
-
       if (data.voices) {
-        // No explicit type needed for 'v' now, TS knows it is ElevenLabsVoice
         const found = data.voices.find((v) =>
           v.name.toLowerCase().includes("aria")
         );
-
         if (found) {
           const simple: SavedVoice = { id: found.voice_id, name: found.name };
           const others = savedVoices.filter(
@@ -244,26 +167,57 @@ export default function VoiceCloner() {
           setSavedVoices(newList);
           localStorage.setItem("escape_voices", JSON.stringify(newList));
           setSelectedVoiceId(simple.id);
-          setStatus("Système ARIA connecté.");
+          setStatus("ARIA connecté");
         }
       }
     } catch (err) {
       console.error(err);
-      setStatus("Erreur Sync.");
-    } finally {
-      setIsSyncing(false);
+      setStatus("Erreur Sync");
     }
   };
 
-  const playText = async (text: string) => {
-    if (isPlaying) return;
+  const togglePreset = useCallback(
+    (idx: number, filename: string) => {
+      const state = presetStates[idx];
+      if (state?.playing) {
+        socket.emit("audio:pause-preset", { presetIdx: idx });
+        setPresetStates((prev) => ({
+          ...prev,
+          [idx]: { ...prev[idx], playing: false },
+        }));
+      } else {
+        socket.emit("audio:play-preset", { presetIdx: idx, file: filename });
+        setPresetStates((prev) => ({
+          ...prev,
+          [idx]: {
+            playing: true,
+            currentTime: prev[idx]?.currentTime ?? 0,
+            duration: prev[idx]?.duration ?? 0,
+          },
+        }));
+      }
+    },
+    [presetStates]
+  );
 
+  const seekPreset = useCallback((idx: number, time: number) => {
+    socket.emit("audio:seek-preset", { presetIdx: idx, time });
+    setPresetStates((prev) => ({
+      ...prev,
+      [idx]: { ...prev[idx], currentTime: time },
+    }));
+  }, []);
+
+  const playText = async (text: string) => {
+    if (isApiPlaying) return;
     const API_KEY = import.meta.env.VITE_ELEVEN_LABS_API_KEY;
     if (!API_KEY) return alert("API Key manquante");
-    if (!selectedVoiceId) return alert("Sélectionnez une voix");
+    if (!selectedVoiceId) {
+      await syncVoices();
+      if (!selectedVoiceId) return alert("Sélectionnez une voix");
+    }
     if (!text) return;
 
-    setAudioUrl(null);
     setIsGenerating(true);
 
     try {
@@ -284,9 +238,13 @@ export default function VoiceCloner() {
       );
       if (res.ok) {
         const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
-        setIsPlaying(true);
+        const audioBase64 = await blobToBase64(blob);
+        socket.emit("audio:play-tts", {
+          audioBase64,
+          mimeType: blob.type || "audio/mpeg",
+        });
+        setIsApiPlaying(true);
+        setTimeout(() => setIsApiPlaying(false), 5000);
       }
     } catch (err) {
       console.error(err);
@@ -295,7 +253,6 @@ export default function VoiceCloner() {
     }
   };
 
-  // --- CLONING LOGIC ---
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -334,10 +291,7 @@ export default function VoiceCloner() {
         headers: { "xi-api-key": API_KEY },
         body: fd,
       });
-
-      // STRICT TYPING HERE TOO
       const d = (await res.json()) as AddVoiceResponse;
-
       if (res.ok) {
         const nv = { id: d.voice_id, name: newVoiceName };
         const nl = [...savedVoices, nv];
@@ -345,7 +299,7 @@ export default function VoiceCloner() {
         localStorage.setItem("escape_voices", JSON.stringify(nl));
         setFile(null);
         setNewVoiceName("");
-        setStatus("Voix clonée !");
+        setStatus("Voix clonée");
       }
     } catch (e) {
       console.error(e);
@@ -354,306 +308,193 @@ export default function VoiceCloner() {
     }
   };
 
+  const handleIaVolume = useCallback((volume: number) => {
+    setIaVolume(volume);
+    socket.emit("audio:volume-ia", { volume });
+  }, []);
+
   return (
-    <div className="voice-cloner-container">
-      <div className="crt-overlay"></div>
-
-      {/* HEADER */}
-      <header className="aria-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <div style={{ width: "60px", height: "50px" }}>
-            <AriaMascot />
-          </div>
-          <div>
-            <div className="header-title">AUDIO CONTROL</div>
-            <div
-              style={{ fontSize: "0.7rem", opacity: 0.7, letterSpacing: "2px" }}
-            >
-              SYSTEM: ONLINE
-            </div>
-          </div>
+    <div className="sound-control">
+      {/* VOLUME IA */}
+      <section className="sc-section">
+        <label className="sc-label">VOLUME IA</label>
+        <div className="sc-volume-row">
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={iaVolume}
+            onChange={(e) => handleIaVolume(parseFloat(e.target.value))}
+            className="sc-ia-volume"
+          />
+          <span className="sc-volume-value">{Math.round(iaVolume * 100)}%</span>
         </div>
-        <button onClick={syncVoices} disabled={isSyncing} className="aria-btn">
-          {isSyncing ? "..." : "↻ RÉINITIALISER VOIX ARIA"}
-        </button>
-      </header>
+      </section>
 
-      <div className="cloner-grid">
-        {/* LEFT PANEL: VOICES */}
-        <div className="panel">
-          <div className="panel-header">BASE DE DONNÉES VOCALE</div>
-          <div className="scrollable-content">
-            {ariaVoice ? (
-              <div
-                onClick={() => setSelectedVoiceId(ariaVoice.id)}
-                className={`voice-item ${selectedVoiceId === ariaVoice.id ? "active" : ""}`}
-                style={{
-                  flexDirection: "column",
-                  textAlign: "center",
-                  alignItems: "center",
-                }}
-              >
-                <div style={{ width: "50px", height: "40px" }}>
-                  <AriaMascot />
-                </div>
-                <div style={{ fontWeight: "bold" }}>{ariaVoice.name}</div>
-                <div style={{ fontSize: "0.6rem" }}>PRINCIPAL</div>
-              </div>
-            ) : (
-              <div
-                style={{ padding: "20px", textAlign: "center", opacity: 0.5 }}
-              >
-                Aria non trouvée
-              </div>
-            )}
-
-            <div
-              style={{
-                height: "1px",
-                background: "var(--color-aria-primary)",
-                margin: "20px 0",
-                opacity: 0.3,
-              }}
-            ></div>
-
-            {otherVoices.map((v) => (
-              <div
-                key={v.id}
-                onClick={() => setSelectedVoiceId(v.id)}
-                className={`voice-item ${selectedVoiceId === v.id ? "active" : ""}`}
-              >
-                <span>{v.name}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const nl = savedVoices.filter((i) => i.id !== v.id);
-                    setSavedVoices(nl);
-                    localStorage.setItem("escape_voices", JSON.stringify(nl));
-                  }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "inherit",
-                    cursor: "pointer",
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* RIGHT PANEL: CONTROLS */}
-        <div className="panel" style={{ borderRight: "none" }}>
-          <div className="panel-header">INTERFACE DE COMMANDE</div>
-          <div
-            className="scrollable-content"
-            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-          >
-            {/* DYNAMIC NAME (Still API) */}
-            <div>
-              <div
-                style={{
-                  fontSize: "0.7rem",
-                  marginBottom: "5px",
-                  letterSpacing: "2px",
-                }}
-              >
-                PROTOCOLE D'ACCUEIL (API)
-              </div>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <input
-                  type="text"
-                  value={participantName}
-                  onChange={(e) => setParticipantName(e.target.value)}
-                  placeholder="Prénom..."
-                  className="input-line"
-                  style={{ flexGrow: 1 }}
-                />
-                <button
-                  onClick={() =>
-                    playText(
-                      `Bonjour ${participantName}, je suis ARIA. Une intelligence artificielle à vos cotés. Pour vous.`
-                    )
-                  }
-                  disabled={isGenerating || isPlaying || !participantName}
-                  className="aria-btn"
-                  style={{ whiteSpace: "nowrap", opacity: isPlaying ? 0.5 : 1 }}
-                >
-                  {isGenerating ? "..." : "► DIRE"}
-                </button>
-              </div>
-            </div>
-
-            {/* MANUAL (Still API) */}
-            <div>
-              <div
-                style={{
-                  fontSize: "0.7rem",
-                  marginBottom: "5px",
-                  letterSpacing: "2px",
-                }}
-              >
-                MESSAGE MANUEL (API)
-              </div>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <textarea
-                  value={customText}
-                  onChange={(e) => setCustomText(e.target.value)}
-                  className="message-box"
-                  placeholder="Message..."
-                />
-                <button
-                  onClick={() => playText(customText)}
-                  disabled={isGenerating || isPlaying || !customText}
-                  className="aria-btn"
-                  style={{ height: "auto", opacity: isPlaying ? 0.5 : 1 }}
-                >
-                  {isGenerating ? "..." : "▶"}
-                </button>
-              </div>
-            </div>
-
-            {/* PRESETS (LOCAL FILE FAILSAFE) */}
-            <div>
-              <div
-                style={{
-                  fontSize: "0.7rem",
-                  marginBottom: "10px",
-                  letterSpacing: "2px",
-                }}
-              >
-                PROTOCOLES RAPIDES (OFFLINE READY)
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "10px",
-                }}
-              >
-                {PRESET_TEXTS.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => playLocalPreset(preset.file)}
-                    disabled={isPlaying}
-                    className="voice-item"
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      flexDirection: "column",
-                      alignItems: "flex-start",
-                      background: "rgba(0,0,0,0.4)",
-                      margin: 0,
-                      opacity: isPlaying ? 0.5 : 1,
-                      cursor: isPlaying ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    <span style={{ fontWeight: "bold", color: "#fff" }}>
-                      {preset.label}
-                    </span>
-                    <div
-                      style={{
-                        fontSize: "0.7rem",
-                        opacity: 0.6,
-                        marginTop: "5px",
-                        fontStyle: "italic",
-                      }}
-                    >
-                      "{preset.content}"
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* PLAYER (For API Audio) */}
-            <div
-              style={{
-                borderTop: "1px solid var(--color-aria-primary)",
-                paddingTop: "15px",
-                minHeight: "40px",
-                display: "flex",
-                justifyContent: "center",
-              }}
-            >
-              {isGenerating ? (
-                <span style={{ animation: "blink 0.5s infinite" }}>
-                  TRANSMISSION...
-                </span>
-              ) : audioUrl ? (
-                <audio
-                  controls
-                  src={audioUrl}
-                  autoPlay
-                  onEnded={() => setIsPlaying(false)}
-                  onError={() => setIsPlaying(false)}
-                />
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* FOOTER: CLONER */}
-      <section className="creator-section">
-        <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "10px" }}>
-          NOUVELLE ENTRÉE VOCALE
-        </div>
-        <div style={{ display: "flex", gap: "20px", alignItems: "end" }}>
-          <div style={{ flexGrow: 1 }}>
-            <input
-              type="text"
-              value={newVoiceName}
-              onChange={(e) => setNewVoiceName(e.target.value)}
-              className="input-line"
-              placeholder="Nom..."
-            />
-          </div>
-          <div>
-            {!isRecording ? (
-              <button onClick={startRecording} className="aria-btn">
-                🎤 REC
-              </button>
-            ) : (
-              <button
-                onClick={stopRecording}
-                className="aria-btn"
-                style={{ background: "cyan", color: "black" }}
-              >
-                ⏹ STOP
-              </button>
-            )}
-          </div>
-          <div style={{ flexGrow: 1 }}>
-            <input
-              type="file"
-              onChange={(e) =>
-                setFile(e.target.files ? e.target.files[0] : null)
-              }
-              style={{ fontSize: "0.8rem" }}
-            />
-          </div>
+      {/* PRÉNOM */}
+      <section className="sc-section">
+        <label className="sc-label">PROTOCOLE D'ACCUEIL (API)</label>
+        <div className="sc-row">
+          <input
+            type="text"
+            value={participantName}
+            onChange={(e) => setParticipantName(e.target.value)}
+            placeholder="Prénom..."
+            className="sc-input"
+          />
           <button
-            onClick={handleClone}
-            disabled={isCloning}
-            className="aria-btn"
+            onClick={() =>
+              playText(
+                `Bonjour ${participantName}, je suis ARIA. Une intelligence artificielle à vos cotés. Pour vous.`
+              )
+            }
+            disabled={isGenerating || isApiPlaying || !participantName}
+            className="sc-btn"
           >
+            {isGenerating ? "..." : "DIRE"}
+          </button>
+        </div>
+      </section>
+
+      {/* MESSAGE MANUEL */}
+      <section className="sc-section">
+        <label className="sc-label">MESSAGE MANUEL (API)</label>
+        <div className="sc-row">
+          <textarea
+            value={customText}
+            onChange={(e) => setCustomText(e.target.value)}
+            className="sc-textarea"
+            placeholder="Message..."
+          />
+          <button
+            onClick={() => playText(customText)}
+            disabled={isGenerating || isApiPlaying || !customText}
+            className="sc-btn sc-btn-tall"
+          >
+            {isGenerating ? "..." : "DIRE"}
+          </button>
+        </div>
+      </section>
+
+      {/* PROTOCOLES RAPIDES */}
+      <section className="sc-section">
+        <label className="sc-label">PROTOCOLES RAPIDES (OFFLINE READY)</label>
+        <div className="sc-preset-grid">
+          {PRESET_TEXTS.map((preset, idx) => {
+            const state = presetStates[idx];
+            const hasState = !!state;
+            const isPlaying = state?.playing ?? false;
+
+            return (
+              <div
+                key={idx}
+                className={`sc-preset-wrap ${hasState ? "has-state" : ""}`}
+              >
+                <button
+                  onClick={() => togglePreset(idx, preset.file)}
+                  className={`sc-preset ${isPlaying ? "active" : ""} ${hasState && !isPlaying ? "paused" : ""}`}
+                >
+                  <span className="sc-preset-label">
+                    {isPlaying ? "⏸" : hasState ? "▶" : ""} {preset.label}
+                  </span>
+                  <span className="sc-preset-content">"{preset.content}"</span>
+                </button>
+                {hasState && (
+                  <div className="sc-timeline-wrap">
+                    <input
+                      type="range"
+                      min="0"
+                      max={state.duration || 1}
+                      step="0.1"
+                      value={state.currentTime}
+                      onChange={(e) =>
+                        seekPreset(idx, parseFloat(e.target.value))
+                      }
+                      className="sc-timeline"
+                    />
+                    <span className="sc-timeline-time">
+                      {formatTime(state.currentTime)}/
+                      {formatTime(state.duration)}
+                    </span>
+                    <button
+                      className="sc-restart-btn"
+                      onClick={() => {
+                        seekPreset(idx, 0);
+                        if (!isPlaying) {
+                          socket.emit("audio:play-preset", {
+                            presetIdx: idx,
+                            file: preset.file,
+                          });
+                          setPresetStates((prev) => ({
+                            ...prev,
+                            [idx]: {
+                              ...prev[idx],
+                              playing: true,
+                              currentTime: 0,
+                            },
+                          }));
+                        }
+                      }}
+                      title="Rejouer depuis le début"
+                    >
+                      <svg
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 2v12l10-6z" />
+                        <line x1="1" y1="2" x2="1" y2="14" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* TTS STATUS */}
+      {isGenerating && (
+        <section className="sc-section sc-player">
+          <span className="sc-transmitting">TRANSMISSION...</span>
+        </section>
+      )}
+
+      {/* NOUVELLE ENTRÉE VOCALE */}
+      <section className="sc-section sc-clone">
+        <label className="sc-label">NOUVELLE ENTRÉE VOCALE</label>
+        <div className="sc-row sc-clone-row">
+          <input
+            type="text"
+            value={newVoiceName}
+            onChange={(e) => setNewVoiceName(e.target.value)}
+            className="sc-input"
+            placeholder="Nom..."
+          />
+          {!isRecording ? (
+            <button onClick={startRecording} className="sc-btn">
+              REC
+            </button>
+          ) : (
+            <button onClick={stopRecording} className="sc-btn sc-btn-recording">
+              STOP
+            </button>
+          )}
+          <input
+            type="file"
+            onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+            className="sc-file"
+          />
+          <button onClick={handleClone} disabled={isCloning} className="sc-btn">
             CLONER
           </button>
         </div>
-        <div
-          style={{
-            textAlign: "center",
-            fontSize: "0.7rem",
-            color: "yellow",
-            marginTop: "5px",
-            height: "15px",
-          }}
-        >
-          {status}
-        </div>
+        {status && <div className="sc-status">{status}</div>}
       </section>
     </div>
   );
