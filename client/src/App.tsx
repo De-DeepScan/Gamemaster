@@ -778,7 +778,10 @@ function App() {
                             return (
                               <ActionButton
                                 key={action.id}
-                                action={action}
+                                action={{
+                                  ...action,
+                                  label: "Réinitialiser",
+                                }}
                                 variant={getVariant(action.id)}
                                 status={feedbackStatus}
                                 onClick={(payload) =>
@@ -855,7 +858,7 @@ function App() {
                               key={`${inst.gameId}-${action.id}`}
                               action={{
                                 ...action,
-                                label: `${action.label} - ${inst.name}`,
+                                label: `Réinitialiser - ${inst.name}`,
                               }}
                               variant={getVariant(action.id)}
                               status={status}
@@ -878,13 +881,11 @@ function App() {
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         title={
-          confirmDialog.variant === "danger"
-            ? "Confirmer la réinitialisation"
-            : "Attention"
+          confirmDialog.variant === "danger" ? "Réinitialiser ?" : "Attention"
         }
         message={
           confirmDialog.variant === "danger"
-            ? "Cette action va réinitialiser le jeu. Toute progression sera perdue. Êtes-vous sûr de vouloir continuer ?"
+            ? "Êtes-vous sûr ?"
             : "Cette action va entrer la solution directement dans le jeu. Êtes-vous sûr de vouloir continuer ?"
         }
         confirmLabel={

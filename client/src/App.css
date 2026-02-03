@@ -658,15 +658,12 @@
   bottom: 0;
   left: 0;
   right: var(--sidebar-width);
-  background: var(--color-bg-surface);
-  border-top: 2px solid var(--color-danger);
   padding: var(--space-xl) var(--space-2xl);
   display: flex;
   gap: var(--space-xl);
   justify-content: center;
   align-items: center;
   z-index: 40;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
 }
 
 .reset-actions-bar .action-button {
@@ -911,14 +908,14 @@
 }
 
 .dialog-icon {
-  font-size: 2.5rem;
+  font-size: 3.5rem;
   margin-bottom: var(--space-md);
 }
 
 .dialog-title {
   color: #f59e0b;
   font-family: var(--font-primary);
-  font-size: var(--text-lg);
+  font-size: var(--text-2xl);
   text-transform: uppercase;
   letter-spacing: 3px;
   margin: 0 0 var(--space-lg);
@@ -927,7 +924,7 @@
 .dialog-message {
   color: var(--color-text-secondary);
   font-family: var(--font-primary);
-  font-size: var(--text-sm);
+  font-size: var(--text-xl);
   line-height: 1.6;
   margin: 0 0 var(--space-2xl);
 }
@@ -939,9 +936,9 @@
 }
 
 .dialog-btn {
-  padding: var(--space-sm) var(--space-2xl);
+  padding: var(--space-lg) var(--space-3xl);
   font-family: var(--font-primary);
-  font-size: var(--text-sm);
+  font-size: var(--text-lg);
   text-transform: uppercase;
   letter-spacing: 2px;
   cursor: pointer;
