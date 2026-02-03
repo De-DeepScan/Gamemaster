@@ -44,6 +44,15 @@ interface GameGroup {
   isConnected: boolean;
 }
 
+// ARIA state interface for preview
+interface AriaState {
+  isEvil: boolean;
+  isSpeaking: boolean;
+  isDilemmaOpen: boolean;
+  currentDilemmaIndex: number;
+  totalDilemmas: number;
+}
+
 // Predefined games that should always be visible
 const PREDEFINED_GAMES: PredefinedGame[] = [
   {
@@ -115,7 +124,117 @@ function getVariant(actionId: string): string {
     return "success";
   if (actionId === "disable_ai" || actionId === "skip_phase") return "warning";
   if (actionId === "remove_points") return "danger";
+  // ARIA-specific variants
+  if (actionId === "enable_evil" || actionId === "enable_dilemma")
+    return "danger";
+  if (actionId === "disable_evil" || actionId === "disable_dilemma")
+    return "success";
+  if (actionId === "enable_speaking") return "success";
+  if (actionId === "disable_speaking") return "warning";
   return "primary";
+}
+
+// Extract ARIA state from connected games
+function getAriaState(games: ConnectedGame[]): AriaState | null {
+  const ariaGame = games.find((g) => g.gameId === "aria");
+  if (!ariaGame) return null;
+  return {
+    isEvil: (ariaGame.state.isEvil as boolean) ?? false,
+    isSpeaking: (ariaGame.state.isSpeaking as boolean) ?? false,
+    isDilemmaOpen: (ariaGame.state.isDilemmaOpen as boolean) ?? false,
+    currentDilemmaIndex: (ariaGame.state.currentDilemmaIndex as number) ?? 0,
+    totalDilemmas: (ariaGame.state.totalDilemmas as number) ?? 0,
+  };
+}
+
+// Filter ARIA actions based on current state (show only relevant toggle)
+function getFilteredAriaActions(
+  actions: GameAction[],
+  ariaState: AriaState | null
+): GameAction[] {
+  if (!ariaState) return actions;
+
+  return actions.filter((action) => {
+    // Show enable_evil only when NOT evil, disable_evil only when evil
+    if (action.id === "enable_evil") return !ariaState.isEvil;
+    if (action.id === "disable_evil") return ariaState.isEvil;
+    // Show enable_speaking only when NOT speaking, disable_speaking when speaking
+    if (action.id === "enable_speaking") return !ariaState.isSpeaking;
+    if (action.id === "disable_speaking") return ariaState.isSpeaking;
+    // Show enable_dilemma only when dilemma NOT open, disable_dilemma when open
+    if (action.id === "enable_dilemma") return !ariaState.isDilemmaOpen;
+    if (action.id === "disable_dilemma") return ariaState.isDilemmaOpen;
+    return true; // Keep other actions like reset
+  });
+}
+
+// ARIA Preview component
+function AriaPreview({ state }: { state: AriaState }) {
+  return (
+    <div className={`aria-preview ${state.isEvil ? "evil" : "good"}`}>
+      <div className="aria-preview-header">
+        <span className="preview-title">ARIA Status</span>
+      </div>
+      <div className="aria-preview-content">
+        {/* Cat Avatar */}
+        <div className={`aria-avatar ${state.isEvil ? "evil" : ""}`}>
+          <svg viewBox="0 0 100 90" className="aria-cat-mini">
+            {/* Simplified cat head */}
+            <path
+              d={
+                state.isEvil
+                  ? "M 20 55 L 10 25 L 30 40 Q 50 30, 70 40 L 90 25 L 80 55 C 85 70, 70 85, 50 85 C 30 85, 15 70, 20 55 Z"
+                  : "M 20 55 L 18 20 L 35 40 Q 50 30, 65 40 L 82 20 L 80 55 C 85 70, 70 85, 50 85 C 30 85, 15 70, 20 55 Z"
+              }
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            />
+            {/* Eye */}
+            <ellipse
+              cx="50"
+              cy="55"
+              rx="20"
+              ry="10"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            />
+            <line
+              x1="50"
+              y1="48"
+              x2="50"
+              y2="62"
+              stroke="currentColor"
+              strokeWidth="2"
+            />
+          </svg>
+          {state.isSpeaking && (
+            <div className="speaking-indicator">
+              <span className="sound-wave"></span>
+              <span className="sound-wave"></span>
+              <span className="sound-wave"></span>
+            </div>
+          )}
+        </div>
+
+        {/* Status Tags */}
+        <div className="aria-status-tags">
+          <span className={`aria-tag ${state.isEvil ? "active evil" : ""}`}>
+            {state.isEvil ? "EVIL" : "GOOD"}
+          </span>
+          <span className={`aria-tag ${state.isSpeaking ? "active" : ""}`}>
+            {state.isSpeaking ? "SPEAKING" : "SILENT"}
+          </span>
+          {state.isDilemmaOpen && (
+            <span className="aria-tag active warning">
+              DILEMME {state.currentDilemmaIndex + 1}/{state.totalDilemmas}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function getRoleName(game: ConnectedGame): string {
@@ -456,6 +575,13 @@ function App() {
               })}
             </div>
 
+            {/* ARIA Preview - show when ARIA tab is active and connected */}
+            {activeGroup.baseId === "aria" &&
+              (() => {
+                const ariaState = getAriaState(games);
+                return ariaState ? <AriaPreview state={ariaState} /> : null;
+              })()}
+
             {/* Actions — per-instance sections when instances have different actions */}
             {activeGroup.instances.length > 0 &&
               (() => {
@@ -471,54 +597,61 @@ function App() {
                       )
                   );
 
+                // Get filtered actions for ARIA (toggle based on state)
+                const ariaState =
+                  activeGroup.baseId === "aria" ? getAriaState(games) : null;
+                const actionsToRender =
+                  activeGroup.baseId === "aria"
+                    ? getFilteredAriaActions(
+                        activeGroup.instances[0].availableActions,
+                        ariaState
+                      )
+                    : activeGroup.instances[0].availableActions;
+
                 if (allSameActions) {
                   return (
                     <div className="button-grid">
-                      {activeGroup.instances[0].availableActions.map(
-                        (action) => {
-                          const allStatuses = activeGroup.instances.map(
-                            (inst) => getStatus(inst.gameId, action.id)
-                          );
-                          const isLoading = allStatuses.some(
-                            (s) => s === "loading"
-                          );
-                          const isSuccess = allStatuses.every(
-                            (s) => s === "success"
-                          );
-                          const isError = allStatuses.some(
-                            (s) => s === "error"
-                          );
+                      {actionsToRender.map((action) => {
+                        const allStatuses = activeGroup.instances.map((inst) =>
+                          getStatus(inst.gameId, action.id)
+                        );
+                        const isLoading = allStatuses.some(
+                          (s) => s === "loading"
+                        );
+                        const isSuccess = allStatuses.every(
+                          (s) => s === "success"
+                        );
+                        const isError = allStatuses.some((s) => s === "error");
 
-                          let feedbackStatus: ActionStatus = "idle";
-                          if (isLoading) feedbackStatus = "loading";
-                          else if (isSuccess) feedbackStatus = "success";
-                          else if (isError) feedbackStatus = "error";
+                        let feedbackStatus: ActionStatus = "idle";
+                        if (isLoading) feedbackStatus = "loading";
+                        else if (isSuccess) feedbackStatus = "success";
+                        else if (isError) feedbackStatus = "error";
 
-                          return (
-                            <button
-                              key={action.id}
-                              className={`control-btn ${getVariant(action.id)}`}
-                              onClick={() =>
-                                handleActionClick(activeGroup.instances, action)
-                              }
-                              disabled={isLoading}
-                            >
-                              <span className="btn-label">{action.label}</span>
-                              {feedbackStatus !== "idle" && (
-                                <span
-                                  className={`btn-feedback ${feedbackStatus}`}
-                                >
-                                  {feedbackStatus === "loading"
-                                    ? "..."
-                                    : feedbackStatus === "success"
-                                      ? "✓"
-                                      : "✕"}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        }
-                      )}
+                        return (
+                          <button
+                            key={action.id}
+                            className={`control-btn ${getVariant(action.id)}`}
+                            onClick={() =>
+                              handleActionClick(activeGroup.instances, action)
+                            }
+                            disabled={isLoading}
+                          >
+                            <span className="btn-label">{action.label}</span>
+                            {feedbackStatus !== "idle" && (
+                              <span
+                                className={`btn-feedback ${feedbackStatus}`}
+                              >
+                                {feedbackStatus === "loading"
+                                  ? "..."
+                                  : feedbackStatus === "success"
+                                    ? "✓"
+                                    : "✕"}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   );
                 }
