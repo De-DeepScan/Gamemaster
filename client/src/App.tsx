@@ -244,9 +244,36 @@ function AriaPreview({ state }: { state: AriaState }) {
   return (
     <div className={`aria-preview ${state.isEvil ? "evil" : "good"}`}>
       <div className="aria-preview-header">
-        <span className="preview-title">ARIA Status</span>
+        <span className="preview-title">ARIA CAT</span>
       </div>
       <div className="aria-preview-content">
+        {/* GAUCHE: Informations de statut en texte */}
+        <div className="aria-status-text">
+          <div className="status-line">
+            <span className="status-key">Mode:</span>
+            <span className={`status-value ${state.isEvil ? "evil" : "good"}`}>
+              {state.isEvil ? "Evil" : "Good"}
+            </span>
+          </div>
+          <div className="status-line">
+            <span className="status-key">Voix:</span>
+            <span
+              className={`status-value ${state.isSpeaking ? "active" : ""}`}
+            >
+              {state.isSpeaking ? "Active" : "Inactive"}
+            </span>
+          </div>
+          {state.isDilemmaOpen && (
+            <div className="status-line dilemma">
+              <span className="status-key">Dilemme:</span>
+              <span className="status-value warning">
+                {state.currentDilemmaIndex + 1}/{state.totalDilemmas}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* DROITE: Avatar du chat avec animations */}
         <div className={`aria-avatar ${state.isEvil ? "evil" : ""}`}>
           <svg viewBox="0 0 200 180" className="aria-cat-mini">
             <path
@@ -353,19 +380,6 @@ function AriaPreview({ state }: { state: AriaState }) {
               <span className="sound-wave"></span>
               <span className="sound-wave"></span>
             </div>
-          )}
-        </div>
-        <div className="aria-status-tags">
-          <span className={`aria-tag ${state.isEvil ? "active evil" : ""}`}>
-            {state.isEvil ? "EVIL" : "GOOD"}
-          </span>
-          <span className={`aria-tag ${state.isSpeaking ? "active" : ""}`}>
-            {state.isSpeaking ? "SPEAKING" : "SILENT"}
-          </span>
-          {state.isDilemmaOpen && (
-            <span className="aria-tag active warning">
-              DILEMME {state.currentDilemmaIndex + 1}/{state.totalDilemmas}
-            </span>
           )}
         </div>
       </div>
