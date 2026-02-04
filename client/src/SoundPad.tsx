@@ -13,13 +13,13 @@ const SOUNDS: SoundItem[] = [
   {
     id: "digital-1",
     label: "Digital 1",
-    file: "digital-sound-1.mp3",
+    file: "digital-01.mp3",
     icon: "waveform",
   },
   {
     id: "digital-2",
     label: "Digital 2",
-    file: "digital-sound-2.mp3",
+    file: "digital-02.mp3",
     icon: "circuit",
   },
   { id: "light", label: "Light", file: "light.mp3", icon: "light" },

@@ -54,7 +54,13 @@ export function setupAudioRelay(io: Server) {
 
     // audio:play-ambient - read file and send base64
     socket.on("audio:play-ambient", (payload: PlayAmbientPayload) => {
-      const filePath = path.join(__dirname, "..", "sounds", payload.file);
+      const filePath = path.join(
+        __dirname,
+        "..",
+        "audio",
+        "ambient",
+        payload.file
+      );
       const audioBase64 = readFileAsBase64(filePath);
       if (!audioBase64) return;
 
@@ -67,7 +73,13 @@ export function setupAudioRelay(io: Server) {
 
     // audio:play-preset - read file and send base64
     socket.on("audio:play-preset", (payload: PlayPresetPayload) => {
-      const filePath = path.join(__dirname, "..", "presets", payload.file);
+      const filePath = path.join(
+        __dirname,
+        "..",
+        "audio",
+        "presets",
+        payload.file
+      );
       const audioBase64 = readFileAsBase64(filePath);
       if (!audioBase64) return;
 

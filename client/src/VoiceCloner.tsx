@@ -30,7 +30,7 @@ const PRESET_TEXTS: Preset[] = [
   {
     label: "Question Idiot",
     content: "questions idiot, reponse idiot",
-    file: "Stupid questions.mp3",
+    file: "stupid-questions.mp3",
   },
   {
     label: "Phase 1",
@@ -45,7 +45,7 @@ const PRESET_TEXTS: Preset[] = [
   {
     label: "avec plaisir",
     content: "avec plaisir",
-    file: "phase-1-03-oui-avec-plaisir.mp3",
+    file: "phase-1-03-avec-plaisir.mp3",
   },
   {
     label: "presentation",
@@ -57,7 +57,7 @@ const PRESET_TEXTS: Preset[] = [
   {
     label: "quelques secondes",
     content: "quelques secondes",
-    file: "phase-3-03-encore-quelqueseconde.mp3",
+    file: "phase-3-03-quelques-secondes.mp3",
   },
   { label: "phase 4", content: "phase4", file: "phase-4.mp3" },
   { label: "Finale", content: "finale", file: "finale.mp3" },
