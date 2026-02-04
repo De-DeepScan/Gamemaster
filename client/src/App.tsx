@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, type FormEvent, type ChangeEvent } from "react";
 import { toast, Toaster } from "sonner";
 import { Navbar } from "./components/Navbar";
 import { EventTimeline } from "./components/EventTimeline";
@@ -269,6 +269,16 @@ function getFilteredMapActions(
   });
 }
 
+// Filter Messagerie actions - hide send_custom, send_predefined and start_sequence
+function getFilteredMessagerieActions(actions: GameAction[]): GameAction[] {
+  return actions.filter((action) => {
+    if (action.id === "send_custom") return false;
+    if (action.id === "send_predefined") return false;
+    if (action.id === "start_sequence") return false;
+    return true;
+  });
+}
+
 interface ConfirmDialogState {
   isOpen: boolean;
   action: GameAction | null;
@@ -290,6 +300,7 @@ function App() {
     instances: [],
     params: {},
   });
+  const [customMessage, setCustomMessage] = useState("");
 
   // Add event to timeline
   const addEvent = useCallback(
@@ -638,7 +649,11 @@ function App() {
                               activeGroup.instances[0].availableActions,
                               activeGroup.instances[0].state
                             )
-                          : activeGroup.instances[0].availableActions;
+                          : activeGroup.baseId === "messagerie"
+                            ? getFilteredMessagerieActions(
+                                activeGroup.instances[0].availableActions
+                              )
+                            : activeGroup.instances[0].availableActions;
 
                 if (allSameActions) {
                   const regularActions = actionsToRender.filter(
@@ -731,6 +746,41 @@ function App() {
                             );
                           })}
                         </div>
+                      )}
+
+                      {/* Custom message input for Messagerie */}
+                      {activeGroup.baseId === "messagerie" && (
+                        <form
+                          className="custom-message-form"
+                          onSubmit={(e: FormEvent) => {
+                            e.preventDefault();
+                            if (customMessage.trim()) {
+                              sendToAll(
+                                activeGroup.instances,
+                                { id: "send_custom", label: "Envoyer" },
+                                { content: customMessage.trim() }
+                              );
+                              setCustomMessage("");
+                            }
+                          }}
+                        >
+                          <input
+                            type="text"
+                            className="custom-message-input"
+                            value={customMessage}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                              setCustomMessage(e.target.value)
+                            }
+                            placeholder="Message personnalisé..."
+                          />
+                          <button
+                            type="submit"
+                            className="custom-message-submit"
+                            disabled={!customMessage.trim()}
+                          >
+                            Envoyer
+                          </button>
+                        </form>
                       )}
                     </>
                   );
