@@ -167,6 +167,11 @@
   opacity: 1;
 }
 
+.sc-fader-group {
+  display: flex;
+  gap: 8px;
+}
+
 /* === Center Content === */
 .sc-center {
   flex: 1;

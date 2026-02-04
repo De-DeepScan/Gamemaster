@@ -245,7 +245,7 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
 
   // Volume states per phase (persisted)
   const [volumesByPhase, setVolumesByPhase] = useState<
-    Record<number, { ia: number; ambient: number }>
+    Record<number, { ia: number; general: number; ambientMaster: number }>
   >(() => {
     const stored = localStorage.getItem("sc_volumes_by_phase");
     if (stored) {
@@ -260,7 +260,8 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
 
   // Current phase volumes (derived)
   const iaVolume = volumesByPhase[selectedPhase]?.ia ?? 0.5;
-  const ambientVolume = volumesByPhase[selectedPhase]?.ambient ?? 0.5;
+  const generalVolume = volumesByPhase[selectedPhase]?.general ?? 0.5;
+  const ambientMaster = volumesByPhase[selectedPhase]?.ambientMaster ?? 0.5;
 
   // Input states
   const [participantName, setParticipantName] = useState("");
@@ -311,7 +312,7 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
   // Sync volumes to audio players when phase changes (or on mount)
   useEffect(() => {
     socket.emit("audio:volume-ia", { volume: iaVolume });
-    socket.emit("audio:master-volume", { volume: ambientVolume });
+    socket.emit("audio:master-volume", { volume: generalVolume });
   }, [selectedPhase]);
 
   // Persist per-phase data
@@ -381,7 +382,8 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
         [selectedPhase]: {
           ...prev[selectedPhase],
           ia: volume,
-          ambient: prev[selectedPhase]?.ambient ?? 0.5,
+          general: prev[selectedPhase]?.general ?? 0.5,
+          ambientMaster: prev[selectedPhase]?.ambientMaster ?? 0.5,
         },
       }));
       socket.emit("audio:volume-ia", { volume });
@@ -389,19 +391,45 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
     [selectedPhase]
   );
 
-  const handleAmbientVolume = useCallback(
+  const handleGeneralVolume = useCallback(
     (volume: number) => {
       setVolumesByPhase((prev) => ({
         ...prev,
         [selectedPhase]: {
-          ia: prev[selectedPhase]?.ia ?? 0.5,
           ...prev[selectedPhase],
-          ambient: volume,
+          ia: prev[selectedPhase]?.ia ?? 0.5,
+          ambientMaster: prev[selectedPhase]?.ambientMaster ?? 0.5,
+          general: volume,
         },
       }));
       socket.emit("audio:master-volume", { volume });
     },
     [selectedPhase]
+  );
+
+  const handleAmbientMaster = useCallback(
+    (volume: number) => {
+      setVolumesByPhase((prev) => ({
+        ...prev,
+        [selectedPhase]: {
+          ...prev[selectedPhase],
+          ia: prev[selectedPhase]?.ia ?? 0.5,
+          general: prev[selectedPhase]?.general ?? 0.5,
+          ambientMaster: volume,
+        },
+      }));
+      // Scale all active ambient sounds proportionally
+      const states = ambientByPhase[selectedPhase] ?? {};
+      for (const [soundId, state] of Object.entries(states)) {
+        if (state.active) {
+          socket.emit("audio:set-ambient-volume", {
+            soundId,
+            volume: state.volume * volume,
+          });
+        }
+      }
+    },
+    [selectedPhase, ambientByPhase]
   );
 
   // Sync voice from ElevenLabs
@@ -600,6 +628,8 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
 
       // Start ambient sounds saved for the target phase
       const targetStates = ambientByPhase[targetPhase] ?? {};
+      const targetAmbientMaster =
+        volumesByPhase[targetPhase]?.ambientMaster ?? 0.5;
       for (const [soundId, state] of Object.entries(targetStates)) {
         if (state.active) {
           const sound = AMBIENT_SOUNDS.find((s) => s.id === soundId);
@@ -607,13 +637,13 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
             socket.emit("audio:play-ambient", {
               soundId,
               file: sound.file,
-              volume: state.volume,
+              volume: state.volume * targetAmbientMaster,
             });
           }
         }
       }
     },
-    [selectedPhase, ambientByPhase]
+    [selectedPhase, ambientByPhase, volumesByPhase]
   );
 
   // Toggle ambient sound
@@ -631,7 +661,7 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
         socket.emit("audio:play-ambient", {
           soundId: sound.id,
           file: sound.file,
-          volume: vol,
+          volume: vol * ambientMaster,
         });
         setAmbientStates((prev) => ({
           ...prev,
@@ -639,7 +669,7 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
         }));
       }
     },
-    [ambientStates, setAmbientStates]
+    [ambientStates, setAmbientStates, ambientMaster]
   );
 
   // Change ambient volume
@@ -652,11 +682,11 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
       if (ambientStates[sound.id]?.active) {
         socket.emit("audio:set-ambient-volume", {
           soundId: sound.id,
-          volume,
+          volume: volume * ambientMaster,
         });
       }
     },
-    [ambientStates, setAmbientStates]
+    [ambientStates, setAmbientStates, ambientMaster]
   );
 
   // Get presets for selected phase
@@ -685,13 +715,6 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
 
       {/* Main Content with Volume Faders */}
       <div className="sc-main-layout">
-        {/* Left Volume Fader - Voix IA */}
-        <VolumeFader
-          label="Voix IA"
-          value={iaVolume}
-          onChange={handleIaVolume}
-        />
-
         {/* Center Content */}
         <div className="sc-center">
           {/* Message manuel */}
@@ -908,12 +931,20 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
           </div>
         </div>
 
-        {/* Right Volume Fader - Ambiance */}
-        <VolumeFader
-          label="Ambiance"
-          value={ambientVolume}
-          onChange={handleAmbientVolume}
-        />
+        {/* Volume Faders */}
+        <div className="sc-fader-group">
+          <VolumeFader label="IA" value={iaVolume} onChange={handleIaVolume} />
+          <VolumeFader
+            label="Ambiance"
+            value={ambientMaster}
+            onChange={handleAmbientMaster}
+          />
+          <VolumeFader
+            label="Général"
+            value={generalVolume}
+            onChange={handleGeneralVolume}
+          />
+        </div>
       </div>
     </div>
   );
