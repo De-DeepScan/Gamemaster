@@ -243,9 +243,24 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
   const [completedPhases, setCompletedPhases] = useState<number[]>([]);
   const [selectedPhase, setSelectedPhase] = useState(1);
 
-  // Volume states
-  const [iaVolume, setIaVolume] = useState(0.5);
-  const [ambientVolume, setAmbientVolume] = useState(0.5);
+  // Volume states per phase (persisted)
+  const [volumesByPhase, setVolumesByPhase] = useState<
+    Record<number, { ia: number; ambient: number }>
+  >(() => {
+    const stored = localStorage.getItem("sc_volumes_by_phase");
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        /* ignore */
+      }
+    }
+    return {};
+  });
+
+  // Current phase volumes (derived)
+  const iaVolume = volumesByPhase[selectedPhase]?.ia ?? 0.5;
+  const ambientVolume = volumesByPhase[selectedPhase]?.ambient ?? 0.5;
 
   // Input states
   const [participantName, setParticipantName] = useState("");
@@ -260,10 +275,23 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
     {}
   );
 
-  // Ambient states: soundId -> { active, volume }
-  const [ambientStates, setAmbientStates] = useState<
-    Record<string, { active: boolean; volume: number }>
-  >({});
+  // Ambient states per phase: phase -> soundId -> { active, volume } (persisted)
+  const [ambientByPhase, setAmbientByPhase] = useState<
+    Record<number, Record<string, { active: boolean; volume: number }>>
+  >(() => {
+    const stored = localStorage.getItem("sc_ambient_by_phase");
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        /* ignore */
+      }
+    }
+    return {};
+  });
+
+  // Current phase ambient states (derived)
+  const ambientStates = ambientByPhase[selectedPhase] ?? {};
 
   // Voice sync
   const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
@@ -278,9 +306,33 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
       );
       if (aria) setSelectedVoiceId(aria.id);
     }
-    socket.emit("audio:volume-ia", { volume: 0.5 });
-    socket.emit("audio:master-volume", { volume: 0.5 });
+    socket.emit("audio:volume-ia", { volume: iaVolume });
+    socket.emit("audio:master-volume", { volume: ambientVolume });
   }, []);
+
+  // Persist per-phase data
+  useEffect(() => {
+    localStorage.setItem("sc_volumes_by_phase", JSON.stringify(volumesByPhase));
+  }, [volumesByPhase]);
+
+  useEffect(() => {
+    localStorage.setItem("sc_ambient_by_phase", JSON.stringify(ambientByPhase));
+  }, [ambientByPhase]);
+
+  // Helper to update ambient states for the selected phase
+  const setAmbientStates = useCallback(
+    (
+      updater: (
+        prev: Record<string, { active: boolean; volume: number }>
+      ) => Record<string, { active: boolean; volume: number }>
+    ) => {
+      setAmbientByPhase((prev) => ({
+        ...prev,
+        [selectedPhase]: updater(prev[selectedPhase] ?? {}),
+      }));
+    },
+    [selectedPhase]
+  );
 
   // Listen for preset progress
   useEffect(() => {
@@ -318,15 +370,35 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
   }, []);
 
   // Handle volume changes
-  const handleIaVolume = useCallback((volume: number) => {
-    setIaVolume(volume);
-    socket.emit("audio:volume-ia", { volume });
-  }, []);
+  const handleIaVolume = useCallback(
+    (volume: number) => {
+      setVolumesByPhase((prev) => ({
+        ...prev,
+        [selectedPhase]: {
+          ...prev[selectedPhase],
+          ia: volume,
+          ambient: prev[selectedPhase]?.ambient ?? 0.5,
+        },
+      }));
+      socket.emit("audio:volume-ia", { volume });
+    },
+    [selectedPhase]
+  );
 
-  const handleAmbientVolume = useCallback((volume: number) => {
-    setAmbientVolume(volume);
-    socket.emit("audio:master-volume", { volume });
-  }, []);
+  const handleAmbientVolume = useCallback(
+    (volume: number) => {
+      setVolumesByPhase((prev) => ({
+        ...prev,
+        [selectedPhase]: {
+          ia: prev[selectedPhase]?.ia ?? 0.5,
+          ...prev[selectedPhase],
+          ambient: volume,
+        },
+      }));
+      socket.emit("audio:master-volume", { volume });
+    },
+    [selectedPhase]
+  );
 
   // Sync voice from ElevenLabs
   const syncVoice = async () => {
@@ -491,7 +563,7 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
     const nextPhase = phaseId + 1;
     if (nextPhase <= 7) {
       setCurrentPhase(nextPhase);
-      setSelectedPhase(nextPhase);
+      switchPhase(nextPhase);
     }
   };
 
@@ -506,6 +578,46 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
   const getAudioStatus = (gameId: string) => {
     return audioPlayers.some((p) => p.gameId === gameId);
   };
+
+  // Switch phase: stop current ambients, start saved ones for target phase
+  const switchPhase = useCallback(
+    (targetPhase: number) => {
+      if (targetPhase === selectedPhase) return;
+
+      // Stop all currently active ambient sounds
+      const currentStates = ambientByPhase[selectedPhase] ?? {};
+      for (const [soundId, state] of Object.entries(currentStates)) {
+        if (state.active) {
+          socket.emit("audio:stop-ambient", { soundId });
+        }
+      }
+
+      setSelectedPhase(targetPhase);
+
+      // Restore volumes for the target phase
+      const targetVolumes = volumesByPhase[targetPhase];
+      socket.emit("audio:volume-ia", { volume: targetVolumes?.ia ?? 0.5 });
+      socket.emit("audio:master-volume", {
+        volume: targetVolumes?.ambient ?? 0.5,
+      });
+
+      // Start ambient sounds saved for the target phase
+      const targetStates = ambientByPhase[targetPhase] ?? {};
+      for (const [soundId, state] of Object.entries(targetStates)) {
+        if (state.active) {
+          const sound = AMBIENT_SOUNDS.find((s) => s.id === soundId);
+          if (sound) {
+            socket.emit("audio:play-ambient", {
+              soundId,
+              file: sound.file,
+              volume: state.volume,
+            });
+          }
+        }
+      }
+    },
+    [selectedPhase, ambientByPhase, volumesByPhase]
+  );
 
   // Toggle ambient sound
   const toggleAmbient = useCallback(
@@ -530,7 +642,7 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
         }));
       }
     },
-    [ambientStates]
+    [ambientStates, setAmbientStates]
   );
 
   // Change ambient volume
@@ -547,7 +659,7 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
         });
       }
     },
-    [ambientStates]
+    [ambientStates, setAmbientStates]
   );
 
   // Get presets for selected phase
@@ -616,7 +728,7 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
                   <button
                     key={phase.id}
                     className={`sc-phase-btn ${status} ${selectedPhase === phase.id ? "selected" : ""}`}
-                    onClick={() => setSelectedPhase(phase.id)}
+                    onClick={() => switchPhase(phase.id)}
                     title={phase.subtitle}
                   >
                     <span className="sc-phase-indicator">
