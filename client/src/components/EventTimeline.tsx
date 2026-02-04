@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 export interface TimelineEvent {
   id: string;
   timestamp: Date;
-  type: "connection" | "action" | "error" | "state_change";
+  type: "connection" | "action" | "error" | "state_change" | "audio";
   message: string;
   gameId?: string;
   status?: "success" | "error" | "info";
@@ -39,6 +39,7 @@ export function EventTimeline({ events }: EventTimelineProps) {
     if (event.status === "success") return "success";
     if (event.status === "error") return "error";
     if (event.type === "connection") return "connection";
+    if (event.type === "audio") return "audio";
     return "info";
   };
 

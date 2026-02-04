@@ -248,6 +248,10 @@
   border-left-color: var(--color-text-muted);
 }
 
+.timeline-event.audio {
+  border-left-color: #a855f7;
+}
+
 .event-time {
   color: var(--color-text-muted);
   font-weight: 600;

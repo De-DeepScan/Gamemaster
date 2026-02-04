@@ -1,0 +1,66 @@
+/* Spotify Widget - Floating Button */
+
+.spotify-widget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+
+  width: 48px;
+  height: 48px;
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid rgba(30, 215, 96, 0.5);
+  border-radius: 50%;
+
+  color: #1ed760;
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.spotify-widget:hover {
+  transform: scale(1.1);
+  border-color: #1ed760;
+  box-shadow: 0 0 20px rgba(30, 215, 96, 0.4);
+}
+
+.spotify-widget:active {
+  transform: scale(1.05);
+}
+
+.spotify-widget.playing {
+  background: rgba(30, 215, 96, 0.15);
+}
+
+.spotify-widget svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Pulsing animation when playing */
+.spotify-widget.playing::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 2px solid rgba(30, 215, 96, 0.3);
+  border-radius: 50%;
+  animation: spotify-pulse 2s ease-in-out infinite;
+}
+
+@keyframes spotify-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}

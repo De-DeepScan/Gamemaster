@@ -8,8 +8,8 @@ import { ActionButton } from "./components/ActionButton";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import type { AriaState } from "./types/aria";
 import "./App.css";
-import VoiceCloner from "./VoiceCloner";
-import SoundPad from "./SoundPad";
+import { SoundControl } from "./components/SoundControl";
+import { SpotifyWidget } from "./components/SpotifyWidget";
 import { socket, API_URL } from "./socket";
 
 type ActionStatus = "idle" | "loading" | "success" | "error";
@@ -19,6 +19,19 @@ interface GameAction {
   label: string;
   params?: string[];
   disabled?: boolean;
+}
+
+interface AudioPlayerStatus {
+  gameId: string | null;
+  socketId: string;
+}
+
+interface AudioLogPayload {
+  type: "preset" | "tts" | "ambient" | "system";
+  action: "play" | "stop" | "pause" | "error" | "info";
+  message: string;
+  gameId?: string;
+  timestamp: string;
 }
 
 type GameStatus = "connected" | "reconnecting" | "not_started";
@@ -241,7 +254,7 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, ActionStatus>>({});
-  const [audioPlayerCount, setAudioPlayerCount] = useState(0);
+  const [audioPlayers, setAudioPlayers] = useState<AudioPlayerStatus[]>([]);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({
     isOpen: false,
@@ -326,9 +339,24 @@ function App() {
       setGames(data);
     });
 
-    socket.on("audio-players-updated", (data: { count: number }) =>
-      setAudioPlayerCount(data.count)
+    // Audio status updates (with per-game tracking)
+    socket.on(
+      "audio-status-updated",
+      (data: { players: AudioPlayerStatus[]; count: number }) => {
+        setAudioPlayers(data.players);
+      }
     );
+
+    // Audio logs for timeline
+    socket.on("audio:log", (data: AudioLogPayload) => {
+      const status =
+        data.action === "error"
+          ? "error"
+          : data.action === "play"
+            ? "success"
+            : "info";
+      addEvent("audio", data.message, data.gameId, status);
+    });
 
     fetch(`${API_URL}/api/games`)
       .then((r) => r.json())
@@ -339,7 +367,8 @@ function App() {
       socket.off("connect");
       socket.off("disconnect");
       socket.off("games_updated");
-      socket.off("audio-players-updated");
+      socket.off("audio-status-updated");
+      socket.off("audio:log");
     };
   }, [addEvent, games]);
 
@@ -514,22 +543,13 @@ function App() {
         connected={connected}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        audioPlayerCount={audioPlayerCount}
+        audioPlayerCount={audioPlayers.length}
       />
       <EventTimeline events={events} />
 
       <main className="controls">
         {activeTab === "sound_control" ? (
-          <div className="sound-control-layout">
-            <div className="sound-control-col">
-              <div className="col-header">IA</div>
-              <VoiceCloner />
-            </div>
-            <div className="sound-control-col">
-              <div className="col-header">AMBIANCE SONORE</div>
-              <SoundPad />
-            </div>
-          </div>
+          <SoundControl audioPlayers={audioPlayers} />
         ) : activeGroup ? (
           <div className="game-panel">
             {/* Instance cards */}
@@ -794,6 +814,9 @@ function App() {
           },
         }}
       />
+
+      {/* Spotify Widget - Global floating button */}
+      <SpotifyWidget />
     </div>
   );
 }
