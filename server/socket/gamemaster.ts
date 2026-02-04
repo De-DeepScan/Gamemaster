@@ -31,7 +31,7 @@ const expectedGames: ExpectedGame[] = [
   { gameId: "sidequest", name: "Sidequest" },
   { gameId: "labyrinthe", name: "Labyrinthe - Explorateur", role: "explorer" },
   { gameId: "labyrinthe", name: "Labyrinthe - Protecteur", role: "protector" },
-  { gameId: "map", name: "Map" },
+  { gameId: "infection-map", name: "Carte Infection" },
 ];
 
 // Key = "gameId:role" or "gameId" if no role
@@ -246,7 +246,7 @@ export function setupGamemaster(io: Server): void {
           sendCommand(io, "labyrinthe:protector", "dilemma_end", {});
 
           // Show video on Map
-          sendCommand(io, "map", "show_dilemme", {
+          sendCommand(io, "infection-map", "show_dilemme", {
             dilemme_id: dilemmaId,
             choice_id: choiceId,
           });

@@ -88,9 +88,9 @@ const PREDEFINED_GAMES: PredefinedGame[] = [
     expectedInstances: [{ gameId: "aria", name: "ARIA Cat" }],
   },
   {
-    baseId: "map",
-    displayName: "Map",
-    expectedInstances: [{ gameId: "map", name: "Map" }],
+    baseId: "infection-map",
+    displayName: "Carte Infection",
+    expectedInstances: [{ gameId: "infection-map", name: "Carte Infection" }],
   },
 ];
 
@@ -627,7 +627,7 @@ function App() {
                             activeGroup.instances[0].availableActions,
                             activeGroup.instances[0].state
                           )
-                        : activeGroup.baseId === "map"
+                        : activeGroup.baseId === "infection-map"
                           ? getFilteredMapActions(
                               activeGroup.instances[0].availableActions,
                               activeGroup.instances[0].state
