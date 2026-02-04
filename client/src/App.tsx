@@ -88,9 +88,9 @@ const PREDEFINED_GAMES: PredefinedGame[] = [
     expectedInstances: [{ gameId: "aria", name: "ARIA Cat" }],
   },
   {
-    baseId: "map",
-    displayName: "Map",
-    expectedInstances: [{ gameId: "map", name: "Map" }],
+    baseId: "infection-map",
+    displayName: "Carte Infection",
+    expectedInstances: [{ gameId: "infection-map", name: "Carte Infection" }],
   },
   {
     baseId: "messagerie",
@@ -262,6 +262,7 @@ function getFilteredMapActions(
   const isDilemmeShowing = mapState.isDilemmeShowing as boolean;
 
   return actions.filter((action) => {
+    if (action.id === "restart") return false;
     if (action.id === "hide_dilemme") return isDilemmeShowing;
     if (action.id === "show_dilemme") return !isDilemmeShowing;
     return true;
@@ -632,7 +633,7 @@ function App() {
                             activeGroup.instances[0].availableActions,
                             activeGroup.instances[0].state
                           )
-                        : activeGroup.baseId === "map"
+                        : activeGroup.baseId === "infection-map"
                           ? getFilteredMapActions(
                               activeGroup.instances[0].availableActions,
                               activeGroup.instances[0].state
