@@ -296,7 +296,7 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
   // Voice sync
   const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
 
-  // Load saved voice on mount + sync initial volumes
+  // Load saved voice on mount
   useEffect(() => {
     const stored = localStorage.getItem("escape_voices");
     if (stored) {
@@ -306,9 +306,13 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
       );
       if (aria) setSelectedVoiceId(aria.id);
     }
+  }, []);
+
+  // Sync volumes to audio players when phase changes (or on mount)
+  useEffect(() => {
     socket.emit("audio:volume-ia", { volume: iaVolume });
     socket.emit("audio:master-volume", { volume: ambientVolume });
-  }, []);
+  }, [selectedPhase]);
 
   // Persist per-phase data
   useEffect(() => {
@@ -594,13 +598,6 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
 
       setSelectedPhase(targetPhase);
 
-      // Restore volumes for the target phase
-      const targetVolumes = volumesByPhase[targetPhase];
-      socket.emit("audio:volume-ia", { volume: targetVolumes?.ia ?? 0.5 });
-      socket.emit("audio:master-volume", {
-        volume: targetVolumes?.ambient ?? 0.5,
-      });
-
       // Start ambient sounds saved for the target phase
       const targetStates = ambientByPhase[targetPhase] ?? {};
       for (const [soundId, state] of Object.entries(targetStates)) {
@@ -616,7 +613,7 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
         }
       }
     },
-    [selectedPhase, ambientByPhase, volumesByPhase]
+    [selectedPhase, ambientByPhase]
   );
 
   // Toggle ambient sound
