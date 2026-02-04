@@ -1,3 +1,4 @@
+import React from "react";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast, Toaster } from "sonner";
 import { Navbar } from "./components/Navbar";
@@ -10,6 +11,8 @@ import type { AriaState } from "./types/aria";
 import "./App.css";
 import { ControleAudio } from "./components/ControleAudio";
 import { socket, API_URL } from "./socket";
+import { CameraDashboard } from "./components/CameraDashboard";
+import { CameraTransmitter } from "./components/CameraTransmitter";
 
 type ActionStatus = "idle" | "loading" | "success" | "error";
 
@@ -249,6 +252,16 @@ interface ConfirmDialogState {
 }
 
 function App() {
+  // === NEW: CHECK FOR CAMERA MODE ===
+  const params = new URLSearchParams(window.location.search);
+  const isCameraMode = params.get("mode") === "camera";
+
+  // If we are in camera mode, we ONLY render the transmitter
+  if (isCameraMode) {
+    return <CameraTransmitter />;
+  }
+  // ==================================
+
   const [games, setGames] = useState<ConnectedGame[]>([]);
   const [connected, setConnected] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -375,7 +388,8 @@ function App() {
 
   useEffect(() => {
     // Don't auto-switch if we're on sound_control tab
-    if (activeTab === "sound_control") return;
+    // === NEW: Don't switch if on cameras tab ===
+    if (activeTab === "sound_control" || activeTab === "cameras") return;
 
     // Auto-select first game tab if no valid game tab is active
     if (
@@ -386,7 +400,11 @@ function App() {
     }
 
     // Clear tab if no games available and not on sound_control
-    if (groups.length === 0 && activeTab !== "sound_control") {
+    if (
+      groups.length === 0 &&
+      activeTab !== "sound_control" &&
+      activeTab !== "cameras"
+    ) {
       setActiveTab(null);
     }
   }, [groups, activeTab]);
@@ -543,11 +561,18 @@ function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
+      {/* IMPORTANT: You need to add a "CAMERAS" button in your components/Navbar.tsx 
+        that calls onTabChange('cameras') 
+      */}
+
       <EventTimeline events={events} />
 
       <main className="controls">
         {activeTab === "sound_control" ? (
           <ControleAudio audioPlayers={audioPlayers} />
+        ) : activeTab === "cameras" ? (
+          // === NEW: RENDER CAMERA DASHBOARD ===
+          <CameraDashboard />
         ) : activeGroup ? (
           <div className="game-panel">
             {/* Instance cards */}

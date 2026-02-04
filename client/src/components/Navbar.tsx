@@ -144,6 +144,29 @@ export function Navbar({
           <span className="status-dot sound-dot" />
           <span className="game-name">Controle Audio</span>
         </button>
+
+        {/* NEW: CAMERAS TAB */}
+        <button
+          className={`game-status-block ${activeTab === "cameras" ? "active" : ""}`}
+          onClick={() => onTabChange("cameras")}
+          style={{
+            borderColor:
+              activeTab === "cameras" ? "#00ffff" : "rgba(0, 255, 255, 0.2)",
+          }}
+        >
+          <div
+            className="status-dot"
+            style={{
+              background: activeTab === "cameras" ? "#00ffff" : "#555",
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+            }}
+          ></div>
+          <span className="game-name" style={{ marginLeft: "6px" }}>
+            CAMERAS
+          </span>
+        </button>
       </div>
 
       {/* Server connection badge */}
