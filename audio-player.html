@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio Player - Gamemaster</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: 1.5rem;
+      font-size: .9rem;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .dot.off {
+      background: #555;
+    }
+
+    .dot.on {
+      background: #4caf50;
+    }
+
+    .channels {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .channel {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .channel h3 {
+      font-size: .85rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: .5rem;
+    }
+
+    .channel .info {
+      font-size: .8rem;
+      color: #aaa;
+      min-height: 1.2em;
+    }
+
+    .channel .info.active {
+      color: #4caf50;
+    }
+
+    .channel .volume {
+      font-size: .75rem;
+      color: #666;
+      margin-top: .4rem;
+    }
+
+    .log-container {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 1rem;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .log-container h3 {
+      font-size: .85rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: .75rem;
+    }
+
+    .log-entry {
+      font-family: monospace;
+      font-size: .75rem;
+      padding: .25rem 0;
+      border-bottom: 1px solid #222;
+      color: #999;
+    }
+
+    .log-entry .time {
+      color: #555;
+    }
+
+    .log-entry.play {
+      color: #4caf50;
+    }
+
+    .log-entry.stop {
+      color: #f44336;
+    }
+
+    .log-entry.volume {
+      color: #ff9800;
+    }
+
+    .log-entry.error {
+      color: #f44336;
+      font-weight: bold;
+    }
+
+    .server-input {
+      display: flex;
+      gap: .5rem;
+      margin-bottom: 1.5rem;
+      align-items: center;
+    }
+
+    .server-input label {
+      font-size: .85rem;
+      color: #888;
+    }
+
+    .server-input input {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: .4rem .6rem;
+      color: #e0e0e0;
+      font-size: .85rem;
+      width: 240px;
+    }
+
+    .server-input button {
+      background: #333;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: .4rem .8rem;
+      color: #e0e0e0;
+      cursor: pointer;
+      font-size: .85rem;
+    }
+
+    .server-input button:hover {
+      background: #444;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Audio Player</h1>
+
+  <div class="server-input">
+    <label>Serveur :</label>
+    <input id="serverUrl" type="text" value="http://10.14.73.40:3000">
+    <button onclick="reconnect()">Connecter</button>
+  </div>
+
+  <div class="status">
+    <div class="dot off" id="statusDot"></div>
+    <span id="statusText">Deconnecte</span>
+    <button id="unlockBtn" onclick="unlockAudio()" style="margin-left:12px;background:#b71c1c;border:1px solid #e53935;border-radius:4px;padding:.4rem .8rem;color:#fff;cursor:pointer;font-size:.85rem;font-weight:bold;">Audio bloque - Cliquer pour activer</button>
+  </div>
+
+  <div class="channels">
+    <div class="channel">
+      <h3>Preset</h3>
+      <div class="info" id="presetInfo">--</div>
+      <div class="volume" id="presetVolume">Volume: --</div>
+    </div>
+    <div class="channel">
+      <h3>Voix IA (TTS)</h3>
+      <div class="info" id="ttsInfo">--</div>
+      <div class="volume" id="ttsVolume">Volume: --</div>
+    </div>
+    <div class="channel">
+      <h3>Ambiance</h3>
+      <div class="info" id="ambientInfo">--</div>
+      <div class="volume" id="ambientVolume">Volume: --</div>
+    </div>
+  </div>
+
+  <div class="log-container" id="logContainer">
+    <h3>Journal</h3>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    // Audio channels
+    const presetAudios = new Map(); // presetIdx -> Audio
+    const ttsAudio = new Audio();
+    const ambientAudios = new Map(); // soundId -> Audio
+
+    // Volume state
+    let masterVolume = 1;
+    let iaVolume = 1;
+    let ambientVolume = 1;
+
+    let socket = null;
+    let audioUnlocked = false;
+
+    function unlockAudio() {
+      const silent = new AudioContext();
+      silent.resume().then(() => silent.close());
+      const a = ttsAudio;
+      a.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+      a.play().then(() => { a.pause(); a.currentTime = 0; a.src = ""; }).catch(() => {});
+      audioUnlocked = true;
+      const btn = document.getElementById("unlockBtn");
+      btn.textContent = "Audio active";
+      btn.style.background = "#2e7d32";
+      btn.style.borderColor = "#4caf50";
+      btn.disabled = true;
+      log("Audio debloque", "play");
+    }
+
+    function log(msg, cls = "") {
+      const el = document.getElementById("logContainer");
+      const entry = document.createElement("div");
+      entry.className = "log-entry " + cls;
+      const now = new Date().toLocaleTimeString("fr-FR");
+      entry.innerHTML = `<span class="time">${now}</span> ${msg}`;
+      el.appendChild(entry);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function setStatus(connected) {
+      document.getElementById("statusDot").className = "dot " + (connected ? "on" : "off");
+      document.getElementById("statusText").textContent = connected ? "Connecte" : "Deconnecte";
+    }
+
+    function applyPresetVolume() {
+      for (const a of presetAudios.values()) a.volume = masterVolume;
+    }
+
+    function getOrCreatePresetAudio(idx) {
+      if (presetAudios.has(idx)) return presetAudios.get(idx);
+      const a = new Audio();
+      a.volume = masterVolume;
+      a.addEventListener("timeupdate", () => {
+        if (!a.paused && socket && socket.connected) {
+          socket.emit("audio:preset-progress", {
+            presetIdx: idx,
+            currentTime: a.currentTime,
+            duration: a.duration || 0,
+          });
+        }
+      });
+      a.addEventListener("ended", () => {
+        if (socket && socket.connected) {
+          socket.emit("audio:preset-progress", {
+            presetIdx: idx,
+            currentTime: a.duration || 0,
+            duration: a.duration || 0,
+            ended: true,
+          });
+        }
+        presetAudios.delete(idx);
+      });
+      presetAudios.set(idx, a);
+      return a;
+    }
+
+    function applyTtsVolume() {
+      ttsAudio.volume = Math.min(1, iaVolume * masterVolume);
+    }
+
+    function applyAmbientVolume() {
+      for (const a of ambientAudios.values()) {
+        a.volume = Math.min(1, ambientVolume * masterVolume);
+      }
+    }
+
+    function playBase64(audioEl, base64, mimeType) {
+      audioEl.src = `data:${mimeType};base64,${base64}`;
+      audioEl.play().catch(e => log("Erreur lecture: " + e.message, "error"));
+    }
+
+    function connect(url) {
+      if (socket) socket.disconnect();
+
+      socket = io(url, { transports: ["websocket", "polling"] });
+
+      socket.on("connect", () => {
+        setStatus(true);
+        log("Connecte au serveur", "play");
+        socket.emit("register-audio-player");
+        log("Enregistre comme audio-player");
+      });
+
+      socket.on("disconnect", () => {
+        setStatus(false);
+        log("Deconnecte", "stop");
+      });
+
+      // -- Presets (independent per presetIdx) --
+      socket.on("audio:play-preset", (data) => {
+        const a = getOrCreatePresetAudio(data.presetIdx);
+        log(`Preset #${data.presetIdx}: ${data.file}`, "play");
+        document.getElementById("presetInfo").textContent = `#${data.presetIdx} ${data.file}`;
+        document.getElementById("presetInfo").className = "info active";
+        playBase64(a, data.audioBase64, data.mimeType);
+      });
+
+      socket.on("audio:pause-preset", (data) => {
+        const idx = data && data.presetIdx;
+        const a = presetAudios.get(idx);
+        if (a) { a.pause(); log(`Preset #${idx} pause`, "stop"); }
+      });
+
+      socket.on("audio:seek-preset", (data) => {
+        const a = presetAudios.get(data && data.presetIdx);
+        if (a && typeof data.currentTime === "number") a.currentTime = data.currentTime;
+      });
+
+      socket.on("audio:stop-preset", (data) => {
+        const idx = data && data.presetIdx;
+        const a = presetAudios.get(idx);
+        if (a) { a.pause(); a.currentTime = 0; presetAudios.delete(idx); }
+        log("Preset stop", "stop");
+      });
+
+      // -- TTS --
+      socket.on("audio:play-tts", (data) => {
+        log("TTS recu", "play");
+        document.getElementById("ttsInfo").textContent = "Lecture...";
+        document.getElementById("ttsInfo").className = "info active";
+        playBase64(ttsAudio, data.audioBase64, data.mimeType);
+        applyTtsVolume();
+      });
+
+      ttsAudio.addEventListener("ended", () => {
+        document.getElementById("ttsInfo").textContent = "--";
+        document.getElementById("ttsInfo").className = "info";
+      });
+
+      // -- Ambient --
+      socket.on("audio:play-ambient", (data) => {
+        log(`Ambiance: ${data.soundId}`, "play");
+        // Stop existing instance of same soundId
+        if (ambientAudios.has(data.soundId)) {
+          ambientAudios.get(data.soundId).pause();
+        }
+        const a = new Audio();
+        a.loop = true;
+        ambientAudios.set(data.soundId, a);
+        playBase64(a, data.audioBase64, data.mimeType);
+        if (data.volume != null) a.volume = data.volume * masterVolume;
+        else applyAmbientVolume();
+        updateAmbientInfo();
+      });
+
+      socket.on("audio:stop-ambient", (data) => {
+        if (data && data.soundId && ambientAudios.has(data.soundId)) {
+          ambientAudios.get(data.soundId).pause();
+          ambientAudios.delete(data.soundId);
+          log(`Ambiance stop: ${data.soundId}`, "stop");
+        } else {
+          // Stop all ambient
+          for (const a of ambientAudios.values()) a.pause();
+          ambientAudios.clear();
+          log("Ambiance stop (toutes)", "stop");
+        }
+        updateAmbientInfo();
+      });
+
+      // -- Volumes --
+      socket.on("audio:master-volume", (data) => {
+        masterVolume = data.volume;
+        applyPresetVolume();
+        applyTtsVolume();
+        applyAmbientVolume();
+        document.getElementById("presetVolume").textContent = `Volume: ${Math.round(masterVolume * 100)}%`;
+        log(`Master volume: ${Math.round(data.volume * 100)}%`, "volume");
+      });
+
+      socket.on("audio:volume-ia", (data) => {
+        iaVolume = data.volume;
+        applyTtsVolume();
+        document.getElementById("ttsVolume").textContent = `Volume: ${Math.round(iaVolume * 100)}%`;
+        log(`Volume IA: ${Math.round(data.volume * 100)}%`, "volume");
+      });
+
+      socket.on("audio:volume-ambient", (data) => {
+        ambientVolume = data.volume;
+        applyAmbientVolume();
+        document.getElementById("ambientVolume").textContent = `Volume: ${Math.round(ambientVolume * 100)}%`;
+        log(`Volume ambiance: ${Math.round(data.volume * 100)}%`, "volume");
+      });
+
+      // -- Stop all --
+      socket.on("audio:stop-all", () => {
+        for (const a of presetAudios.values()) { a.pause(); a.currentTime = 0; }
+        presetAudios.clear();
+        ttsAudio.pause();
+        ttsAudio.currentTime = 0;
+        for (const a of ambientAudios.values()) a.pause();
+        ambientAudios.clear();
+        document.getElementById("presetInfo").textContent = "--";
+        document.getElementById("presetInfo").className = "info";
+        document.getElementById("ttsInfo").textContent = "--";
+        document.getElementById("ttsInfo").className = "info";
+        updateAmbientInfo();
+        log("Stop all", "stop");
+      });
+    }
+
+    function updateAmbientInfo() {
+      const el = document.getElementById("ambientInfo");
+      if (ambientAudios.size === 0) {
+        el.textContent = "--";
+        el.className = "info";
+      } else {
+        el.textContent = [...ambientAudios.keys()].join(", ");
+        el.className = "info active";
+      }
+    }
+
+    function reconnect() {
+      const url = document.getElementById("serverUrl").value;
+      log("Connexion a " + url + "...");
+      connect(url);
+    }
+
+    // Auto-connect on load
+    connect(document.getElementById("serverUrl").value);
+  </script>
+</body>
+
+</html>
