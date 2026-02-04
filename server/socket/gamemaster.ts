@@ -258,6 +258,26 @@ export function setupGamemaster(io: Server): void {
       socket.broadcast.emit("game-message", message);
     });
 
+    // WebRTC signaling relay for webcam streaming (cameraId identifies each stream)
+    socket.on("webrtc:request-offer", (data: { cameraId: string }) => {
+      socket.broadcast.emit("webrtc:request-offer", data);
+    });
+
+    socket.on("webrtc:offer", (data: { cameraId: string; sdp: unknown }) => {
+      socket.broadcast.emit("webrtc:offer", data);
+    });
+
+    socket.on("webrtc:answer", (data: { cameraId: string; sdp: unknown }) => {
+      socket.broadcast.emit("webrtc:answer", data);
+    });
+
+    socket.on(
+      "webrtc:ice-candidate",
+      (data: { cameraId: string; candidate: unknown }) => {
+        socket.broadcast.emit("webrtc:ice-candidate", data);
+      }
+    );
+
     socket.on("disconnect", (reason) => {
       const key = socket.data.gameKey as string | undefined;
       if (!key) return;

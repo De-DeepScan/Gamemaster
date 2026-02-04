@@ -144,6 +144,15 @@ export function Navbar({
           <span className="status-dot sound-dot" />
           <span className="game-name">Controle Audio</span>
         </button>
+
+        {/* Webcam Tab */}
+        <button
+          className={`game-status-block webcam-tab ${activeTab === "webcam" ? "active" : ""}`}
+          onClick={() => onTabChange("webcam")}
+        >
+          <span className="status-dot webcam-dot" />
+          <span className="game-name">Webcam</span>
+        </button>
       </div>
 
       {/* Server connection badge */}
