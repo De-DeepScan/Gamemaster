@@ -326,6 +326,7 @@ function App() {
   });
   const [customMessage, setCustomMessage] = useState("");
   const [isMessageSending, setIsMessageSending] = useState(false);
+  const [messageTimeRemaining, setMessageTimeRemaining] = useState(0);
 
   // Calculate message display duration (matches Messagerie timing)
   const getMessageDuration = (content: string) => {
@@ -465,6 +466,23 @@ function App() {
       setActiveTab(null);
     }
   }, [groups, activeTab]);
+
+  // Countdown timer for message sending
+  useEffect(() => {
+    if (messageTimeRemaining <= 0) return;
+
+    const interval = setInterval(() => {
+      setMessageTimeRemaining((prev: number) => {
+        const newValue = prev - 100;
+        if (newValue <= 0) {
+          return 0;
+        }
+        return newValue;
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [messageTimeRemaining > 0]);
 
   const activeGroup = groups.find((g) => g.baseId === activeTab) ?? null;
 
@@ -703,7 +721,14 @@ function App() {
                       {/* Custom message input for Messagerie - placed above action buttons */}
                       {activeGroup.baseId === "messagerie" && (
                         <div className="messagerie-input-section">
-                          <label className="messagerie-input-label">MESSAGE PERSONNALISÉ</label>
+                          <div className="messagerie-label-row">
+                            <label className="messagerie-input-label">MESSAGE PERSONNALISÉ</label>
+                            {messageTimeRemaining > 0 && (
+                              <span className="messagerie-countdown">
+                                {Math.ceil(messageTimeRemaining / 1000)}s
+                              </span>
+                            )}
+                          </div>
                           <input
                             type="text"
                             className="messagerie-input"
@@ -715,6 +740,7 @@ function App() {
                               if (e.key === "Enter" && customMessage.trim() && !isMessageSending) {
                                 e.preventDefault();
                                 const content = customMessage.trim();
+                                const duration = getMessageDuration(content);
                                 sendToAll(
                                   activeGroup.instances,
                                   { id: "send_custom", label: "Envoyer" },
@@ -722,6 +748,7 @@ function App() {
                                 );
                                 setCustomMessage("");
                                 setIsMessageSending(true);
+                                setMessageTimeRemaining(duration);
                                 setTimeout(() => {
                                   setIsMessageSending(false);
                                 }, getMessageDuration(content));
@@ -806,12 +833,14 @@ function App() {
                               onClick={(payload) => {
                                 // For Messagerie predefined messages, start the timer
                                 if (activeGroup.baseId === "messagerie" && action.id.startsWith("msg_")) {
-                                  setIsMessageSending(true);
                                   // Estimate duration based on label length (approximation)
                                   const estimatedContent = action.label || "";
+                                  const duration = getMessageDuration(estimatedContent);
+                                  setIsMessageSending(true);
+                                  setMessageTimeRemaining(duration);
                                   setTimeout(() => {
                                     setIsMessageSending(false);
-                                  }, getMessageDuration(estimatedContent));
+                                  }, duration);
                                 }
                                 handleActionClick(
                                   activeGroup.instances,

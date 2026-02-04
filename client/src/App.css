@@ -1301,12 +1301,38 @@
   margin-bottom: var(--space-lg);
 }
 
+.messagerie-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .messagerie-input-label {
   font-size: 0.65rem;
   letter-spacing: 2px;
   text-transform: uppercase;
   opacity: 0.6;
   color: var(--color-primary);
+}
+
+.messagerie-countdown {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  animation: pulse-countdown 1s ease-in-out infinite;
+}
+
+@keyframes pulse-countdown {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .messagerie-input {
