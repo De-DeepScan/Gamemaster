@@ -257,6 +257,7 @@ function getFilteredMapActions(
   const isDilemmeShowing = mapState.isDilemmeShowing as boolean;
 
   return actions.filter((action) => {
+    if (action.id === "restart") return false;
     if (action.id === "hide_dilemme") return isDilemmeShowing;
     if (action.id === "show_dilemme") return !isDilemmeShowing;
     return true;
