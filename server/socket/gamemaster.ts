@@ -244,9 +244,38 @@ export function setupGamemaster(io: Server): void {
         // Relay Sidequest score to Labyrinth
         if (data.name === "point_earned" && key === "sidequest") {
           const payload = { points: data.data?.points };
-          sendCommand(io, "labyrinthe:explorer", "sidequest_score", payload);
-          sendCommand(io, "labyrinthe:protector", "sidequest_score", payload);
-          console.log("[relay] Sidequest score → Labyrinth:", payload);
+          const explorerSent = sendCommand(
+            io,
+            "labyrinthe:explorer",
+            "sidequest_score",
+            payload
+          );
+          const protectorSent = sendCommand(
+            io,
+            "labyrinthe:protector",
+            "sidequest_score",
+            payload
+          );
+          console.log(
+            "[relay] Sidequest score → Labyrinth:",
+            payload,
+            "explorer:",
+            explorerSent,
+            "protector:",
+            protectorSent
+          );
+          if (!protectorSent) {
+            const protectorGame = connectedGames.get("labyrinthe:protector");
+            console.log(
+              "[relay] Protector game state:",
+              protectorGame
+                ? {
+                    socketId: !!protectorGame.socketId,
+                    status: protectorGame.status,
+                  }
+                : "NOT FOUND"
+            );
+          }
         }
 
         // Relay dilemma_response from ARIA to Labyrinth and Map
