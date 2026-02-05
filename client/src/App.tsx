@@ -799,6 +799,7 @@ function App() {
     }
   }, [addEvent]);
 
+
   // Global reset: reset all games and audio
   const handleGlobalReset = useCallback(async () => {
     // Reset all connected games that have a reset action
@@ -864,7 +865,11 @@ function App() {
 
       <main className="controls">
         {activeTab === "sound_control" ? (
-          <ControleAudio audioPlayers={audioPlayers} />
+          <ControleAudio
+            audioPlayers={audioPlayers}
+            onLaunchAria={handleLaunchAria}
+            isAriaLaunching={isAriaLaunching}
+          />
         ) : activeGroup ? (
           <div className="game-panel">
             {/* Instance cards */}

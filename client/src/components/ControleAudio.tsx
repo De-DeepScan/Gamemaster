@@ -41,6 +41,8 @@ interface PresetState {
 
 interface ControleAudioProps {
   audioPlayers: AudioPlayerStatus[];
+  onLaunchAria?: () => void;
+  isAriaLaunching?: boolean;
 }
 
 // Preset configurations grouped by phase
@@ -338,7 +340,11 @@ function VolumeFader({
   );
 }
 
-export function ControleAudio({ audioPlayers }: ControleAudioProps) {
+export function ControleAudio({
+  audioPlayers,
+  onLaunchAria,
+  isAriaLaunching,
+}: ControleAudioProps) {
   // Phase progression state (persisted)
   const [currentPhase, setCurrentPhase] = useState(() => {
     const stored = localStorage.getItem("sc_current_phase");
@@ -1059,13 +1065,20 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
                 const hasState = !!state;
                 const isPaused = hasState && !isPlaying;
 
+                // For Phase 5 preset, call onLaunchAria which plays audio + triggers ARIA/map/password
+                const handlePresetClick = () => {
+                  if (preset.id === "phase-5" && onLaunchAria) {
+                    onLaunchAria();
+                  } else {
+                    togglePreset(preset.id, preset.file, globalIdx);
+                  }
+                };
+
                 return (
                   <div
                     key={preset.id}
-                    className={`sc-preset-card ${isPlaying ? "playing" : ""} ${isPaused ? "paused" : ""}`}
-                    onClick={() =>
-                      togglePreset(preset.id, preset.file, globalIdx)
-                    }
+                    className={`sc-preset-card ${isPlaying ? "playing" : ""} ${isPaused ? "paused" : ""} ${preset.id === "phase-5" && isAriaLaunching ? "launching" : ""}`}
+                    onClick={handlePresetClick}
                   >
                     <div className="sc-preset-row">
                       <span className="sc-preset-label">{preset.label}</span>
