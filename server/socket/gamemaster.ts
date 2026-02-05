@@ -116,6 +116,14 @@ export function setupGamemaster(io: Server): void {
         availableActions?: GameAction[];
         role?: string;
       }) => {
+        // Reject labyrinthe registration without role (defense in depth)
+        if (data.gameId === "labyrinthe" && !data.role) {
+          console.warn(
+            `[register] Rejected labyrinthe registration without role from ${socket.id}`
+          );
+          return;
+        }
+
         const key = gameKey(data.gameId, data.role);
 
         // Store key on socket for later lookup
