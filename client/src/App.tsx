@@ -428,6 +428,14 @@ function App() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const TOTAL_GAME_TIME = 15 * 60; // 15 minutes in seconds
 
+  // Global reset dialog
+  const [showGlobalResetDialog, setShowGlobalResetDialog] = useState(false);
+
+  // Game timer (synchronized with Map infection start)
+  const [gameStartTime, setGameStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const TOTAL_GAME_TIME = 15 * 60; // 15 minutes in seconds
+
   // Calculate message display duration (matches Messagerie timing)
   const getMessageDuration = (content: string) => {
     const initialDelay = 200;
@@ -809,7 +817,6 @@ function App() {
       setTimeout(() => setIsAriaLaunching(false), 2000);
     }
   }, [addEvent]);
-
   // Global reset: reset all games and audio
   const handleGlobalReset = useCallback(async () => {
     // Reset all connected games that have a reset action
