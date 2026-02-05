@@ -20,6 +20,9 @@ import { WebcamViewer } from "./components/WebcamViewer";
 import { socket, API_URL } from "./socket";
 import { useTTS } from "./hooks/useTTS";
 
+// Preset index for "Phase 5" audio in PRESETS array
+const PHASE_5_PRESET_IDX = 6;
+
 type ActionStatus = "idle" | "loading" | "success" | "error";
 
 interface GameAction {
@@ -758,10 +761,10 @@ function App() {
     addEvent("action", "Lancement ARIA en cours...", undefined, "info");
 
     try {
-      // 1. Play presentation IA audio
+      // 1. Play Phase 5 audio
       socket.emit("audio:play-preset", {
-        presetIdx: PRESENTATION_IA_PRESET_IDX,
-        file: "phase-2-presentation-ia.mp3",
+        presetIdx: PHASE_5_PRESET_IDX,
+        file: "phase-5.mp3",
       });
 
       // 2. Send commands to all games in parallel
@@ -795,6 +798,7 @@ function App() {
       setTimeout(() => setIsAriaLaunching(false), 2000);
     }
   }, [addEvent]);
+
   // Global reset: reset all games and audio
   const handleGlobalReset = useCallback(async () => {
     // Reset all connected games that have a reset action
