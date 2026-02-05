@@ -388,6 +388,10 @@ interface ConfirmDialogState {
 }
 
 function App() {
+  // Check if we're in popout mode for webcams
+  const isPopoutMode =
+    new URLSearchParams(window.location.search).get("popout") === "webcams";
+
   const [games, setGames] = useState<ConnectedGame[]>([]);
   const [connected, setConnected] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -862,6 +866,16 @@ function App() {
   const getStatus = (gameId: string, actionId: string): ActionStatus => {
     return statuses[`${gameId}:${actionId}`] ?? "idle";
   };
+
+  // Popout mode: render only webcams and timeline
+  if (isPopoutMode) {
+    return (
+      <div className="webcam-popout-container">
+        <WebcamViewer isPopoutMode={true} />
+        <EventTimeline events={events} />
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard">

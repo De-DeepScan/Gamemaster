@@ -1708,3 +1708,83 @@
   }
 }
 
+/* === WEBCAM POPOUT === */
+.webcam-popout-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  padding: var(--space-md);
+}
+
+.webcam-popout-container .webcam-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  flex-shrink: 0;
+}
+
+.webcam-popout-container .event-timeline {
+  flex: 1;
+  min-height: 200px;
+  margin-top: var(--space-md);
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  border-radius: var(--border-radius-sm);
+}
+
+/* Webcam detach button */
+.webcam-detach-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-sm);
+  background: rgba(0, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  border-radius: var(--border-radius-sm);
+  color: var(--color-primary);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all var(--duration-fast) ease;
+}
+
+.webcam-detach-btn:hover {
+  background: rgba(0, 255, 255, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+}
+
+/* Webcam placeholder when detached */
+.webcam-placeholder {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-2xl) var(--space-lg);
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px dashed rgba(0, 255, 255, 0.2);
+  border-radius: var(--border-radius-sm);
+}
+
+.webcam-placeholder-icon {
+  color: var(--color-primary);
+  opacity: 0.5;
+}
+
+.webcam-placeholder-text {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--color-text-muted);
+  text-align: center;
+  margin: 0;
+}
+

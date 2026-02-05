@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { socket } from "../socket";
+import { useWebcamPopout } from "../hooks/useWebcamPopout";
 
 const rtcConfig: RTCConfiguration = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -17,6 +18,10 @@ const CAMERAS: CameraConfig[] = [
 ];
 
 const RETRY_DELAY_MS = 5000;
+
+interface WebcamViewerProps {
+  isPopoutMode?: boolean;
+}
 
 function CameraFeed({
   cameraId,
@@ -192,10 +197,11 @@ function CameraFeed({
   );
 }
 
-export function WebcamViewer() {
+export function WebcamViewer({ isPopoutMode = false }: WebcamViewerProps) {
   const [camerasStatus, setCamerasStatus] = useState<Record<string, boolean>>(
     {}
   );
+  const { isPopoutActive, openPopout, notifyPopoutClosed } = useWebcamPopout();
 
   useEffect(() => {
     function handleStatus(data: Record<string, boolean>) {
@@ -208,8 +214,71 @@ export function WebcamViewer() {
     };
   }, []);
 
+  // Notify when popout window closes
+  useEffect(() => {
+    if (isPopoutMode) {
+      const handleBeforeUnload = () => {
+        notifyPopoutClosed();
+      };
+      window.addEventListener("beforeunload", handleBeforeUnload);
+      return () => {
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+        notifyPopoutClosed();
+      };
+    }
+  }, [isPopoutMode, notifyPopoutClosed]);
+
+  // If we're in the main window and popout is active, show placeholder
+  if (!isPopoutMode && isPopoutActive) {
+    return (
+      <div className="webcam-grid">
+        <div className="webcam-placeholder">
+          <div className="webcam-placeholder-icon">
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+          </div>
+          <p className="webcam-placeholder-text">
+            Cameras ouvertes dans fenetre externe
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="webcam-grid">
+      {/* Detach button - only show in main window, not in popout */}
+      {!isPopoutMode && (
+        <button className="webcam-detach-btn" onClick={openPopout}>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <polyline points="15 3 21 3 21 9" />
+            <line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+          Detacher
+        </button>
+      )}
       {CAMERAS.map((cam) => (
         <CameraFeed
           key={cam.cameraId}
