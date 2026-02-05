@@ -725,6 +725,28 @@ function App() {
     }, 3000);
   }, [sendCommand, addEvent]);
 
+  // Send message to messagerie (from ControleAudio presets)
+  const handleSendMessage = useCallback(
+    async (message: string) => {
+      // Find messagerie instances
+      const messagerieGroup = groups.find((g) => g.baseId === "messagerie");
+      if (messagerieGroup && messagerieGroup.instances.length > 0) {
+        await sendToAll(
+          messagerieGroup.instances,
+          { id: "send_custom", label: "Envoyer" },
+          { content: message }
+        );
+        addEvent(
+          "action",
+          `Message envoyé: "${message.substring(0, 30)}..."`,
+          undefined,
+          "info"
+        );
+      }
+    },
+    [groups, sendToAll, addEvent]
+  );
+
   const handleActionClick = useCallback(
     async (
       instances: ConnectedGame[],
@@ -861,6 +883,7 @@ function App() {
             audioPlayers={audioPlayers}
             onLaunchAria={handleLaunchAria}
             isAriaLaunching={isAriaLaunching}
+            onSendMessage={handleSendMessage}
           />
         ) : activeGroup ? (
           <div className="game-panel">

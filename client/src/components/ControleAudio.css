@@ -732,34 +732,3 @@
 .sc-center::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 255, 255, 0.5);
 }
-
-/* === TTS John Button (different voice) === */
-.sc-tts-john-btn {
-  width: 100%;
-  padding: 12px 16px;
-  margin-top: 8px;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(251, 191, 36, 0.4);
-  border-radius: 4px;
-  color: #fbbf24;
-  font-family: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-align: left;
-}
-
-.sc-tts-john-btn:hover:not(:disabled) {
-  border-color: rgba(251, 191, 36, 0.7);
-  background: rgba(251, 191, 36, 0.1);
-}
-
-.sc-tts-john-btn:disabled,
-.sc-tts-john-btn.busy {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.sc-tts-john-btn.busy {
-  animation: sc-blink 0.5s infinite;
-}

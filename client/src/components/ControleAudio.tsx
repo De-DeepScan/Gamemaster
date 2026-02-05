@@ -18,7 +18,6 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useTTS } from "../hooks/useTTS";
 import "./ControleAudio.css";
 
 // Types
@@ -33,6 +32,7 @@ interface PresetConfig {
   file: string;
   phase: number;
   chainedFile?: string;
+  messageToSend?: string;
 }
 
 interface PresetState {
@@ -45,6 +45,7 @@ interface ControleAudioProps {
   audioPlayers: AudioPlayerStatus[];
   onLaunchAria?: () => void;
   isAriaLaunching?: boolean;
+  onSendMessage?: (message: string) => void;
 }
 
 // Preset configurations grouped by phase
@@ -70,6 +71,14 @@ const PRESETS: PresetConfig[] = [
     phase: 1,
   },
   // Phase 2 - Tchat (ancien phase 4)
+  {
+    id: "phase-2-john",
+    label: "Attendez les gars...",
+    file: "phase-2-john.mp3",
+    phase: 2,
+    messageToSend:
+      "Attendez les gars, je crois que j'ai besoin que vous branchiez un câble pour moi.",
+  },
   {
     id: "phase-3-merci-combo",
     label: "Merci + Quelques secondes",
@@ -340,10 +349,8 @@ export function ControleAudio({
   audioPlayers,
   onLaunchAria,
   isAriaLaunching,
+  onSendMessage,
 }: ControleAudioProps) {
-  // TTS hook for John voice (used for "Attendez les gars..." message)
-  const { playText: playJohnText, isBusy: isJohnBusy } = useTTS("john");
-
   // Phase progression state (persisted)
   const [currentPhase, setCurrentPhase] = useState(() => {
     const stored = localStorage.getItem("sc_current_phase");
@@ -1021,6 +1028,8 @@ export function ControleAudio({
         }, 50);
       }
     }
+    // Sync local state
+    setAmbientStates(() => phase1States);
   }, [ambientByPhase, volumesByPhase, fadeSocket]);
 
   // Listen for global reset (audio:stop-all) to reset phases and restart phase 1 sounds
@@ -1258,24 +1267,6 @@ export function ControleAudio({
             <label className="sc-input-label">
               PRESETS - Phase {selectedPhase}
             </label>
-
-            {/* TTS Button for Phase 2 - John voice (before other presets) */}
-            {selectedPhase === 2 && (
-              <button
-                className={`sc-tts-john-btn ${isJohnBusy ? "busy" : ""}`}
-                onClick={() =>
-                  playJohnText(
-                    "Attendez les gars, je crois que j'ai besoin que vous branchiez un câble pour moi."
-                  )
-                }
-                disabled={isJohnBusy}
-              >
-                {isJohnBusy
-                  ? "Génération..."
-                  : "Attendez les gars... (voix John)"}
-              </button>
-            )}
-
             <div className="sc-preset-list">
               {selectedPresets.map((preset) => {
                 const globalIdx = PRESETS.indexOf(preset);
@@ -1291,6 +1282,14 @@ export function ControleAudio({
                   if (preset.id === "phase-5" && onLaunchAria) {
                     onLaunchAria();
                   } else {
+                    // Send message to messagerie if preset has messageToSend (only when starting, not resuming)
+                    if (
+                      preset.messageToSend &&
+                      onSendMessage &&
+                      !state?.currentTime
+                    ) {
+                      onSendMessage(preset.messageToSend);
+                    }
                     togglePreset(preset.id, preset.file, globalIdx);
                   }
                 };
