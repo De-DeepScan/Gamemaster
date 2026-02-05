@@ -375,6 +375,10 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
   // Voice sync
   const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
 
+  // Editable volume percentage
+  const [editingVolumeId, setEditingVolumeId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
   // Load saved voice on mount
   useEffect(() => {
     const stored = localStorage.getItem("escape_voices");
@@ -990,9 +994,48 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
                       }
                       className="sc-ambient-volume"
                     />
-                    <span className="sc-ambient-percent">
-                      {Math.round(volume * 100)}%
-                    </span>
+                    {editingVolumeId === sound.id ? (
+                      <input
+                        type="number"
+                        className="sc-ambient-percent-input"
+                        value={editValue}
+                        min={0}
+                        max={100}
+                        autoFocus
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const val = Math.max(
+                              0,
+                              Math.min(100, parseInt(editValue) || 0)
+                            );
+                            changeAmbientVolume(sound, val / 100);
+                            setEditingVolumeId(null);
+                          } else if (e.key === "Escape") {
+                            setEditingVolumeId(null);
+                          }
+                        }}
+                        onBlur={() => {
+                          const val = Math.max(
+                            0,
+                            Math.min(100, parseInt(editValue) || 0)
+                          );
+                          changeAmbientVolume(sound, val / 100);
+                          setEditingVolumeId(null);
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className="sc-ambient-percent"
+                        onClick={() => {
+                          setEditingVolumeId(sound.id);
+                          setEditValue(String(Math.round(volume * 100)));
+                        }}
+                        title="Cliquer pour éditer"
+                      >
+                        {Math.round(volume * 100)}%
+                      </span>
+                    )}
                     <span className="sc-ambient-label">{sound.label}</span>
                   </div>
                 );

@@ -652,6 +652,37 @@
   color: rgba(0, 255, 255, 0.5);
   text-align: center;
   line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.sc-ambient-percent:hover {
+  color: var(--color-primary, #00ffff);
+  text-decoration: underline;
+}
+
+.sc-ambient-percent-input {
+  width: 36px;
+  font-size: 0.65rem;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--color-primary, #00ffff);
+  border-radius: 3px;
+  color: var(--color-primary, #00ffff);
+  outline: none;
+  padding: 2px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.sc-ambient-percent-input::-webkit-inner-spin-button,
+.sc-ambient-percent-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.sc-ambient-percent-input[type="number"] {
+  -moz-appearance: textfield;
 }
 
 .sc-ambient-label {
