@@ -372,6 +372,18 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
   // Current phase ambient states (derived)
   const ambientStates = ambientByPhase[selectedPhase] ?? {};
 
+  // BFM/JT volume (persisted)
+  const [jtVolume, setJtVolume] = useState(() => {
+    const stored = localStorage.getItem("sc_jt_volume");
+    return stored ? parseFloat(stored) : 0.5;
+  });
+
+  const handleJtVolume = useCallback((volume: number) => {
+    setJtVolume(volume);
+    localStorage.setItem("sc_jt_volume", String(volume));
+    socket.emit("audio:jt-volume", { volume });
+  }, []);
+
   // Voice sync
   const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
 
@@ -1009,6 +1021,7 @@ export function ControleAudio({ audioPlayers }: ControleAudioProps) {
             value={ambientMaster}
             onChange={handleAmbientMaster}
           />
+          <VolumeFader label="BFM" value={jtVolume} onChange={handleJtVolume} />
         </div>
       </div>
     </div>

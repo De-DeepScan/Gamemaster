@@ -344,6 +344,19 @@ export function setupAudioRelay(io: Server) {
       socket.broadcast.emit("audio:preset-progress", payload);
     });
 
+    // BFM/JT volume: send master-volume only to infection-map
+    socket.on("audio:jt-volume", (payload: { volume: number }) => {
+      for (const [, player] of audioPlayers) {
+        if (player.gameId === JT_GAME_ID) {
+          const sock = io.sockets.sockets.get(player.socketId);
+          sock?.emit("audio:master-volume", { volume: payload.volume });
+          console.log(
+            `[audio-relay] JT volume set to ${Math.round(payload.volume * 100)}%`
+          );
+        }
+      }
+    });
+
     // Spotify: backoffice → player
     socket.on("spotify:toggle", (payload: unknown) => {
       io.to("audio-players").emit("spotify:toggle", payload);
