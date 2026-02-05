@@ -436,6 +436,14 @@ function App() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const TOTAL_GAME_TIME = 15 * 60; // 15 minutes in seconds
 
+  // Global reset dialog
+  const [showGlobalResetDialog, setShowGlobalResetDialog] = useState(false);
+
+  // Game timer (synchronized with Map infection start)
+  const [gameStartTime, setGameStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const TOTAL_GAME_TIME = 15 * 60; // 15 minutes in seconds
+
   // Calculate message display duration (matches Messagerie timing)
   const getMessageDuration = (content: string) => {
     const initialDelay = 200;
@@ -774,50 +782,6 @@ function App() {
     });
   }, []);
 
-  // Launch ARIA: triggers audio, animation, password display, and map infection
-  const handleLaunchAria = useCallback(async () => {
-    setIsAriaLaunching(true);
-    addEvent("action", "Lancement ARIA en cours...", undefined, "info");
-
-    try {
-      // 1. Play presentation IA audio
-      socket.emit("audio:play-preset", {
-        presetIdx: PRESENTATION_IA_PRESET_IDX,
-        file: "phase-2-presentation-ia.mp3",
-      });
-
-      // 2. Send commands to all games in parallel
-      const commands = [
-        // ARIA: start intro animation
-        fetch(`${API_URL}/api/games/aria/command`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "start_intro", payload: {} }),
-        }),
-        // Sidequest: show password screen
-        fetch(`${API_URL}/api/games/sidequest/command`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "start_screen", payload: {} }),
-        }),
-        // Infection Map: start infection
-        fetch(`${API_URL}/api/games/infection-map/command`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "start_infection", payload: {} }),
-        }),
-      ];
-
-      await Promise.allSettled(commands);
-      addEvent("action", "Lancement ARIA réussi", undefined, "success");
-    } catch (error) {
-      console.error("Launch ARIA error:", error);
-      addEvent("action", "Erreur lors du lancement ARIA", undefined, "error");
-    } finally {
-      setTimeout(() => setIsAriaLaunching(false), 2000);
-    }
-  }, [addEvent]);
-  
   // Launch ARIA: triggers audio, animation, password display, and map infection
   const handleLaunchAria = useCallback(async () => {
     setIsAriaLaunching(true);
