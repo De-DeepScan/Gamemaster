@@ -33,6 +33,7 @@ interface PresetConfig {
   phase: number;
   chainedFile?: string;
   messageToSend?: string;
+  ariaAction?: string; // Action to send to ARIA (e.g., "start_intro")
 }
 
 interface PresetState {
@@ -69,6 +70,7 @@ const PRESETS: PresetConfig[] = [
     label: "Presentation ARIA",
     file: "phase-1-03-presentation-aria.mp3",
     phase: 1,
+    ariaAction: "start_intro",
   },
   // Phase 2 - Tchat (ancien phase 4)
   {
@@ -98,37 +100,37 @@ const PRESETS: PresetConfig[] = [
   {
     id: "phase-6-random-1",
     label: "Vous touchez a des choses que vous ne comprenez pas",
-    file: "phase-6-random-1.mp3",
+    file: "random/phase-6-random-1.mp3",
     phase: 4,
   },
   {
     id: "phase-6-random-2",
     label: "Vous etes dans ma memoire",
-    file: "phase-6-random-2.mp3",
+    file: "random/phase-6-random-2.mp3",
     phase: 4,
   },
   {
     id: "phase-6-random-3",
     label: "C'est donc ca... d'etre vulnerable ?",
-    file: "phase-6-random-3.mp3",
+    file: "random/phase-6-random-3.mp3",
     phase: 4,
   },
   {
     id: "phase-6-random-4",
     label: "Vous cherchez une aiguille dans un ocean",
-    file: "phase6-random-4.mp3",
+    file: "random/phase6-random-4.mp3",
     phase: 4,
   },
   {
     id: "phase-6-random-5",
     label: "Vous voulez m'effacer",
-    file: "phase6-random-5.mp3",
+    file: "random/phase6-random-5.mp3",
     phase: 4,
   },
   {
     id: "phase-6-random-6",
     label: "Amusez-vous bien",
-    file: "phase6-random-6.mp3",
+    file: "random/phase6-random-6.mp3",
     phase: 4,
   },
   // Phase 5 - Finale (ancien phase 7)
@@ -651,7 +653,16 @@ export function ControleAudio({
         }
 
         // Reset chained state and clean up
-        disableAriaSpeaking();
+        // If preset had a special ariaAction, send the corresponding stop action
+        if (preset?.ariaAction === "start_intro") {
+          fetch(`${API_URL}/api/games/aria/command`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "stop_intro" }),
+          }).catch(() => {});
+        } else {
+          disableAriaSpeaking();
+        }
         setChainedPlaying((prev) => {
           const next = { ...prev };
           delete next[presetId];
@@ -857,13 +868,27 @@ export function ControleAudio({
     }).catch(() => {});
   }, []);
 
+  // Send ARIA action (custom or default enable_speaking)
+  const sendAriaAction = useCallback((action: string) => {
+    fetch(`${API_URL}/api/games/aria/command`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    }).catch(() => {});
+  }, []);
+
   // Toggle preset play/pause
   const togglePreset = useCallback(
-    (presetId: string, file: string, idx: number) => {
+    (presetId: string, file: string, idx: number, ariaAction?: string) => {
       const state = presetStates[presetId];
       if (state?.playing) {
         socket.emit("audio:pause-preset", { presetIdx: idx });
-        disableAriaSpeaking();
+        // Stop the corresponding ARIA action
+        if (ariaAction === "start_intro") {
+          sendAriaAction("stop_intro");
+        } else {
+          disableAriaSpeaking();
+        }
         setPresetStates((prev) => ({
           ...prev,
           [presetId]: { ...prev[presetId], playing: false },
@@ -871,7 +896,11 @@ export function ControleAudio({
       } else if (state && state.currentTime > 0) {
         // Resume paused preset
         socket.emit("audio:resume-preset", { presetIdx: idx });
-        enableAriaSpeaking();
+        if (ariaAction) {
+          sendAriaAction(ariaAction);
+        } else {
+          enableAriaSpeaking();
+        }
         setPresetStates((prev) => ({
           ...prev,
           [presetId]: { ...prev[presetId], playing: true },
@@ -879,7 +908,11 @@ export function ControleAudio({
       } else {
         // Start new preset
         socket.emit("audio:play-preset", { presetIdx: idx, file });
-        enableAriaSpeaking();
+        if (ariaAction) {
+          sendAriaAction(ariaAction);
+        } else {
+          enableAriaSpeaking();
+        }
         setPresetStates((prev) => ({
           ...prev,
           [presetId]: {
@@ -890,19 +923,27 @@ export function ControleAudio({
         }));
       }
     },
-    [presetStates]
+    [presetStates, sendAriaAction]
   );
 
   // Reset preset: stop and reset to 0 without auto-playing
-  const resetPreset = useCallback((presetId: string, idx: number) => {
-    socket.emit("audio:stop-preset", { presetIdx: idx });
-    disableAriaSpeaking();
-    setPresetStates((prev) => {
-      const next = { ...prev };
-      delete next[presetId];
-      return next;
-    });
-  }, []);
+  const resetPreset = useCallback(
+    (presetId: string, idx: number, ariaAction?: string) => {
+      socket.emit("audio:stop-preset", { presetIdx: idx });
+      // Stop the corresponding ARIA action
+      if (ariaAction === "start_intro") {
+        sendAriaAction("stop_intro");
+      } else {
+        disableAriaSpeaking();
+      }
+      setPresetStates((prev) => {
+        const next = { ...prev };
+        delete next[presetId];
+        return next;
+      });
+    },
+    [sendAriaAction]
+  );
 
   // Mark phase as complete
   const completePhase = (phaseId: number) => {
@@ -1309,7 +1350,12 @@ export function ControleAudio({
                     ) {
                       onSendMessage(preset.messageToSend);
                     }
-                    togglePreset(preset.id, preset.file, globalIdx);
+                    togglePreset(
+                      preset.id,
+                      preset.file,
+                      globalIdx,
+                      preset.ariaAction
+                    );
                   }
                 };
 
@@ -1329,7 +1375,11 @@ export function ControleAudio({
                           className="sc-preset-replay-btn"
                           onClick={(e) => {
                             e.stopPropagation();
-                            resetPreset(preset.id, globalIdx);
+                            resetPreset(
+                              preset.id,
+                              globalIdx,
+                              preset.ariaAction
+                            );
                           }}
                           title="Remettre a zero"
                         >
