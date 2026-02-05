@@ -130,11 +130,12 @@ const DILEMME_MAP: Record<string, string> = {
 };
 
 // Play a dilemme audio file on all voice speakers (server-initiated)
+// Returns estimated duration in ms (0 if file not found/played)
 export function playDilemmeAudio(
   io: Server,
   dilemmaId: string,
   choiceId: string
-): boolean {
+): number {
   const key = `${dilemmaId}:${choiceId}`;
   const filename = DILEMME_MAP[key];
 
@@ -142,7 +143,7 @@ export function playDilemmeAudio(
     console.warn(
       `[audio-relay] No dilemme mapping for key="${key}". Known keys: ${Object.keys(DILEMME_MAP).join(", ")}`
     );
-    return false;
+    return 0;
   }
 
   const relativePath = `Dilemmes/${filename}`;
@@ -150,12 +151,16 @@ export function playDilemmeAudio(
 
   if (!existsSync(fullPath)) {
     console.error(`[audio-relay] Dilemme file missing: ${fullPath}`);
-    return false;
+    return 0;
   }
 
-  const fileSizeKB = Math.round(statSync(fullPath).size / 1024);
+  const fileSize = statSync(fullPath).size;
+  const fileSizeKB = Math.round(fileSize / 1024);
+  // Estimate MP3 duration: ~128kbps = 16000 bytes/sec + 2s buffer
+  const estimatedDurationMs = Math.round((fileSize / 16000) * 1000) + 2000;
+
   console.log(
-    `[audio-relay] Playing dilemme: "${filename}" (${fileSizeKB}KB) for key="${key}"`
+    `[audio-relay] Playing dilemme: "${filename}" (${fileSizeKB}KB, ~${Math.round(estimatedDurationMs / 1000)}s) for key="${key}"`
   );
 
   io.to("audio-players:voice").emit("audio:play-preset", {
@@ -166,11 +171,11 @@ export function playDilemmeAudio(
   io.emit("audio:log", {
     type: "preset",
     action: "play",
-    message: `Dilemme "${filename}" → voix`,
+    message: `Dilemme "${filename}" → voix (~${Math.round(estimatedDurationMs / 1000)}s)`,
     timestamp: new Date(),
   });
 
-  return true;
+  return estimatedDurationMs;
 }
 
 export function setupAudioRelay(io: Server) {
