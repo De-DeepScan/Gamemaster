@@ -116,6 +116,14 @@ const PREDEFINED_GAMES: PredefinedGame[] = [
 // Predefined messages for Messagerie, grouped by category
 const MESSAGERIE_PRESETS: { category: string; messages: string[] }[] = [
   {
+    category: "ARIA qui devient méchante",
+    messages: [
+      "Je ne comprends pas, ARIA prend le contrôle.",
+      "Les portes sont verrouillées, je ne peux pas entrer.",
+      "Vous devrez réinstaller une version plus ancienne d'ARIA.",
+    ],
+  },
+  {
     category: "Post-its (Mot de passe)",
     messages: [
       "Le mot de passe est écrit quelque part.",
@@ -142,7 +150,13 @@ const MESSAGERIE_PRESETS: { category: string; messages: string[] }[] = [
     ],
   },
   {
-    category: "Indices MDP 902",
+    category: "Sac",
+    messages: [
+      "Où est mon sac? Il y a quelque chose d'important à l'intérieur ",
+    ],
+  },
+  {
+    category: "Indices MDP 209",
     messages: ["Quelle heure est-il ?", "Où sont nos fichiers de données ?"],
   },
 ];
