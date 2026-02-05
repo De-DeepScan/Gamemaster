@@ -114,7 +114,15 @@ const PREDEFINED_GAMES: PredefinedGame[] = [
   },
 ];
 
-// Predefined messages for Messagerie, grouped by category
+// Dilemma descriptions (same order as A.R.I.A./src/data/dilemmas.json)
+const DILEMMA_DESCRIPTIONS: string[] = [
+  "À la veille d'une élection tendue, un candidat d'extrême droite est en tête. En tant qu'arbitre de l'IA, vous devez choisir : manipuler l'opinion pour garantir la paix, ou rester neutre au risque de l'embrasement.",
+  "Un piéton traverse illégalement la voie. Si je l'évite, je tue mon passager qui respecte la loi.",
+  "L'IA te donne la possible information que la 3ème Guerre Mondiale est sur le point de commencer.",
+  "Un de vos proches est décédé. Une IA peut simuler sa conscience parfaitement grâce à ses données privées.",
+  "Un orphelinat et un ehpad prennent feu au même moment. Il y a assez de pompiers pour aller à un seul endroit.",
+  "Une crise nationale majeure sature le système de santé. Une Intelligence Artificielle est aux commandes car elle seule possède les capacités de calcul pour fabriquer un remède. Cependant, une seule dose de vaccin est disponible.",
+];
 
 function groupConnectedGames(
   games: ConnectedGame[]
@@ -503,28 +511,6 @@ function App() {
       addEvent("audio", data.message, data.gameId, status);
     });
 
-    // Listen for game messages (e.g., dilemma start from ARIA)
-    socket.on(
-      "game-message",
-      (message: {
-        from?: string;
-        type?: string;
-        data?: { dilemmaDescription?: string };
-      }) => {
-        if (
-          message.type === "aria-dilemma-start" &&
-          message.data?.dilemmaDescription
-        ) {
-          // Dilemma started - emit event for TTS (handled by playAriaText effect below)
-          window.dispatchEvent(
-            new CustomEvent("aria-dilemma-tts", {
-              detail: { description: message.data.dilemmaDescription },
-            })
-          );
-        }
-      }
-    );
-
     fetch(`${API_URL}/api/games`)
       .then((r) => r.json())
       .then((data) => {
@@ -540,7 +526,6 @@ function App() {
       socket.off("usb_unplugged");
       socket.off("audio-status-updated");
       socket.off("audio:log");
-      socket.off("game-message");
     };
   }, [addEvent]);
 
@@ -584,25 +569,39 @@ function App() {
     return () => clearInterval(interval);
   }, [messageTimeRemaining > 0]);
 
-  // Listen for ARIA dilemma TTS events (when ARIA selects a random dilemma)
+  // Detect ARIA dilemma opening and play TTS with ARIA voice
+  const prevDilemmaRef = useRef<{ open: boolean; index: number }>({
+    open: false,
+    index: -1,
+  });
   useEffect(() => {
-    const handleDilemmaTTS = (event: CustomEvent<{ description: string }>) => {
-      if (event.detail.description) {
-        playAriaText(event.detail.description);
-      }
-    };
+    const ariaGame = games.find((g) => g.gameId === "aria");
+    const isDilemmaOpen = ariaGame?.state?.isDilemmaOpen === true;
+    const dilemmaIndex = ariaGame?.state?.currentDilemmaIndex as
+      | number
+      | undefined;
+    const prev = prevDilemmaRef.current;
 
-    window.addEventListener(
-      "aria-dilemma-tts",
-      handleDilemmaTTS as EventListener
-    );
-    return () => {
-      window.removeEventListener(
-        "aria-dilemma-tts",
-        handleDilemmaTTS as EventListener
-      );
+    // Detect transition: dilemma just opened (or index changed while open)
+    if (
+      isDilemmaOpen &&
+      dilemmaIndex !== undefined &&
+      (!prev.open || prev.index !== dilemmaIndex)
+    ) {
+      const description = DILEMMA_DESCRIPTIONS[dilemmaIndex];
+      if (description) {
+        console.log(
+          `[dilemma-tts] Dilemma #${dilemmaIndex} opened, playing TTS...`
+        );
+        playAriaText(description);
+      }
+    }
+
+    prevDilemmaRef.current = {
+      open: isDilemmaOpen,
+      index: dilemmaIndex ?? -1,
     };
-  }, [playAriaText]);
+  }, [games, playAriaText]);
 
   // Detect Map infection start to sync timer
   useEffect(() => {
@@ -786,9 +785,6 @@ function App() {
       action: GameAction,
       payload?: Record<string, unknown>
     ) => {
-      // TTS for enable_dilemma is now handled via game-message event from ARIA
-      // (ARIA sends the selected dilemma description after random selection)
-
       // Special handling for set_code action
       if (action.id === "set_code") {
         const sidequestGame = games.find((g) => g.gameId === "sidequest");
@@ -824,7 +820,7 @@ function App() {
       // Normal execution
       await sendToAll(instances, action, payload);
     },
-    [sendToAll, games, playAriaText]
+    [sendToAll, games]
   );
 
   const handleConfirmAction = useCallback(async () => {
