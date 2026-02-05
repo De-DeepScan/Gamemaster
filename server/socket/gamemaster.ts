@@ -45,10 +45,10 @@ const disconnectTimeouts = new Map<string, NodeJS.Timeout>();
 // Reconnection grace period in ms
 const RECONNECT_GRACE_PERIOD = 10000;
 
-// Camera ping tracking: cameraId -> { socketId, lastPing }
+// Camera ping tracking: cameraId -> { socketId, lastPing, hasStream }
 const connectedCameras = new Map<
   string,
-  { socketId: string; lastPing: number }
+  { socketId: string; lastPing: number; hasStream: boolean }
 >();
 
 // Consider a camera offline if no ping for 45s (1.5x the 30s interval)
@@ -58,7 +58,8 @@ function getCamerasStatus(): Record<string, boolean> {
   const now = Date.now();
   const status: Record<string, boolean> = {};
   for (const [cameraId, info] of connectedCameras) {
-    status[cameraId] = now - info.lastPing < CAMERA_TIMEOUT;
+    // Camera is online only if ping is recent AND stream is available
+    status[cameraId] = now - info.lastPing < CAMERA_TIMEOUT && info.hasStream;
   }
   return status;
 }
@@ -352,13 +353,22 @@ export function setupGamemaster(io: Server): void {
       socket.broadcast.emit("game-message", message);
     });
 
-    // WebRTC camera ping tracking
-    socket.on("webrtc:camera-ping", (data: { cameraId: string }) => {
-      connectedCameras.set(data.cameraId, {
-        socketId: socket.id,
-        lastPing: Date.now(),
-      });
-      io.emit("webrtc:cameras-status", getCamerasStatus());
+    // WebRTC camera ping tracking (hasStream indicates if stream is actually available)
+    socket.on(
+      "webrtc:camera-ping",
+      (data: { cameraId: string; hasStream?: boolean }) => {
+        connectedCameras.set(data.cameraId, {
+          socketId: socket.id,
+          lastPing: Date.now(),
+          hasStream: data.hasStream ?? true, // Default true for backwards compatibility
+        });
+        io.emit("webrtc:cameras-status", getCamerasStatus());
+      }
+    );
+
+    // Relay stream-available to viewers so they can request an offer immediately
+    socket.on("webrtc:stream-available", (data: { cameraId: string }) => {
+      socket.broadcast.emit("webrtc:stream-available", data);
     });
 
     // WebRTC signaling relay for webcam streaming (cameraId identifies each stream)

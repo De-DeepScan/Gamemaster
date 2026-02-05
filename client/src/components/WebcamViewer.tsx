@@ -16,6 +16,8 @@ const CAMERAS: CameraConfig[] = [
   { cameraId: "sidequest", label: "Computer Sidequest" },
 ];
 
+const RETRY_DELAY_MS = 5000;
+
 function CameraFeed({
   cameraId,
   label,
@@ -127,6 +129,33 @@ function CameraFeed({
       cleanup();
     };
   }, [cleanup, requestOffer, cameraId]);
+
+  // Retry automatically if online but no stream for too long
+  useEffect(() => {
+    if (online && status === "waiting") {
+      const retryTimer = setTimeout(() => {
+        console.log(`[webrtc-viewer:${cameraId}] Auto-retrying request...`);
+        requestOffer();
+      }, RETRY_DELAY_MS);
+      return () => clearTimeout(retryTimer);
+    }
+  }, [online, status, cameraId, requestOffer]);
+
+  // Listen for stream-available to request offer immediately
+  useEffect(() => {
+    function handleStreamAvailable(data: { cameraId: string }) {
+      if (data.cameraId === cameraId && status === "waiting") {
+        console.log(
+          `[webrtc-viewer:${cameraId}] Stream available, requesting offer...`
+        );
+        requestOffer();
+      }
+    }
+    socket.on("webrtc:stream-available", handleStreamAvailable);
+    return () => {
+      socket.off("webrtc:stream-available", handleStreamAvailable);
+    };
+  }, [cameraId, status, requestOffer]);
 
   return (
     <div className="camera-feed">
