@@ -805,7 +805,7 @@ function App() {
                         </div>
                       )}
 
-                      {/* AI Toggle for Labyrinthe */}
+                      {/* AI Control for Labyrinthe */}
                       {activeGroup.baseId === "labyrinthe" &&
                         (() => {
                           const bothConnected = areLabyrintheInstancesConnected(
@@ -816,36 +816,28 @@ function App() {
                           );
 
                           return (
-                            <div className="labyrinthe-ai-toggle-section">
-                              <label className="labyrinthe-toggle-label">
-                                CONTRÔLE IA
-                              </label>
-                              <div
-                                className={`labyrinthe-toggle-container ${!bothConnected ? "disabled" : ""}`}
+                            <div className="labyrinthe-ai-section">
+                              <button
+                                className={`labyrinthe-ai-button ${aiEnabled ? "active" : "inactive"} ${!bothConnected ? "disabled" : ""}`}
+                                onClick={() => {
+                                  if (bothConnected) {
+                                    sendToAll(
+                                      activeGroup.instances,
+                                      { id: "set_ai", label: "Toggle IA" },
+                                      { enabled: !aiEnabled }
+                                    );
+                                  }
+                                }}
+                                disabled={!bothConnected}
                               >
-                                <span
-                                  className={`toggle-status ${aiEnabled ? "active" : ""}`}
-                                >
-                                  {aiEnabled ? "IA ACTIVÉE" : "IA DÉSACTIVÉE"}
+                                <span className="ai-button-icon">
+                                  {aiEnabled ? "🤖" : "🔇"}
                                 </span>
-                                <button
-                                  className={`ai-toggle-button ${aiEnabled ? "active" : ""}`}
-                                  onClick={() => {
-                                    if (bothConnected) {
-                                      sendToAll(
-                                        activeGroup.instances,
-                                        { id: "set_ai", label: "Toggle IA" },
-                                        { enabled: !aiEnabled }
-                                      );
-                                    }
-                                  }}
-                                  disabled={!bothConnected}
-                                >
-                                  <span className="toggle-track">
-                                    <span className="toggle-thumb" />
-                                  </span>
-                                </button>
-                              </div>
+                                <span className="ai-button-text">
+                                  {aiEnabled ? "Désactiver l'IA" : "Activer l'IA"}
+                                </span>
+                                <span className={`ai-status-indicator ${aiEnabled ? "on" : "off"}`} />
+                              </button>
                               {!bothConnected && (
                                 <span className="toggle-warning">
                                   Les deux joueurs doivent être connectés
