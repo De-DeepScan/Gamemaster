@@ -118,6 +118,10 @@ function groupConnectedGames(
   const groups = new Map<string, ConnectedGame[]>();
   for (const game of games) {
     const baseId = game.gameId.split(":")[0];
+
+    // Filter out labyrinthe entries without a valid role (ghost entries)
+    if (baseId === "labyrinthe" && !game.role) continue;
+
     const list = groups.get(baseId) ?? [];
     list.push(game);
     groups.set(baseId, list);
@@ -805,49 +809,39 @@ function App() {
                         </div>
                       )}
 
-                      {/* AI Control for Labyrinthe */}
-                      {activeGroup.baseId === "labyrinthe" &&
-                        (() => {
-                          const bothConnected = areLabyrintheInstancesConnected(
-                            activeGroup.instances
-                          );
-                          const aiEnabled = getLabyrintheAIState(
-                            activeGroup.instances
-                          );
+                      <div className="action-grid">
+                        {/* AI Toggle for Labyrinthe - standard ActionButton */}
+                        {activeGroup.baseId === "labyrinthe" &&
+                          (() => {
+                            const bothConnected =
+                              areLabyrintheInstancesConnected(
+                                activeGroup.instances
+                              );
+                            const aiEnabled = getLabyrintheAIState(
+                              activeGroup.instances
+                            );
 
-                          return (
-                            <div className="labyrinthe-ai-section">
-                              <button
-                                className={`labyrinthe-ai-button ${aiEnabled ? "active" : "inactive"} ${!bothConnected ? "disabled" : ""}`}
+                            return (
+                              <ActionButton
+                                action={{
+                                  id: aiEnabled ? "disable_ai" : "enable_ai",
+                                  label: aiEnabled
+                                    ? "Désactiver l'IA"
+                                    : "Activer l'IA",
+                                }}
+                                variant={aiEnabled ? "danger" : "success"}
+                                status="idle"
                                 onClick={() => {
-                                  if (bothConnected) {
-                                    sendToAll(
-                                      activeGroup.instances,
-                                      { id: "set_ai", label: "Toggle IA" },
-                                      { enabled: !aiEnabled }
-                                    );
-                                  }
+                                  sendToAll(
+                                    activeGroup.instances,
+                                    { id: "set_ai", label: "Toggle IA" },
+                                    { enabled: !aiEnabled }
+                                  );
                                 }}
                                 disabled={!bothConnected}
-                              >
-                                <span className="ai-button-icon">
-                                  {aiEnabled ? "🤖" : "🔇"}
-                                </span>
-                                <span className="ai-button-text">
-                                  {aiEnabled ? "Désactiver l'IA" : "Activer l'IA"}
-                                </span>
-                                <span className={`ai-status-indicator ${aiEnabled ? "on" : "off"}`} />
-                              </button>
-                              {!bothConnected && (
-                                <span className="toggle-warning">
-                                  Les deux joueurs doivent être connectés
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })()}
-
-                      <div className="action-grid">
+                              />
+                            );
+                          })()}
                         {regularActions.map((action) => {
                           const allStatuses = activeGroup.instances.map(
                             (inst) => getStatus(inst.gameId, action.id)
