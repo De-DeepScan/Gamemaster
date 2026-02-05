@@ -12,6 +12,8 @@ interface NavbarProps {
   activeTab: string | null;
   onTabChange: (baseId: string) => void;
   usbKeyConnected: boolean;
+  onLaunchAria?: () => void;
+  isAriaLaunching?: boolean;
 }
 
 export function Navbar({
@@ -20,9 +22,26 @@ export function Navbar({
   activeTab,
   onTabChange,
   usbKeyConnected,
+  onLaunchAria,
+  isAriaLaunching,
 }: NavbarProps) {
   return (
     <nav className="navbar">
+      {/* Launch ARIA button */}
+      <div className="navbar-left">
+        <button
+          className={`launch-aria-btn ${isAriaLaunching ? "launching" : ""}`}
+          onClick={onLaunchAria}
+          disabled={isAriaLaunching}
+          title="Lance l'audio ARIA, l'animation, l'affichage du mot de passe et l'infection"
+        >
+          <span className="launch-icon">▶</span>
+          <span className="launch-text">
+            {isAriaLaunching ? "Lancement..." : "Lancer ARIA"}
+          </span>
+        </button>
+      </div>
+
       {/* Game status blocks - now clickable */}
       <div className="navbar-center">
         {groups
