@@ -1482,3 +1482,61 @@
   cursor: not-allowed;
 }
 
+/* Messagerie Presets */
+.messagerie-presets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.preset-category {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preset-category-label {
+  font-size: 0.6rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.5;
+  color: var(--color-primary);
+}
+
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-button {
+  background: rgba(0, 255, 255, 0.06);
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  border-radius: 4px;
+  color: var(--color-text);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.preset-button:hover {
+  background: rgba(0, 255, 255, 0.12);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.preset-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.preset-button:disabled:hover {
+  background: rgba(0, 255, 255, 0.06);
+  border-color: rgba(0, 255, 255, 0.15);
+  color: var(--color-text);
+}
+

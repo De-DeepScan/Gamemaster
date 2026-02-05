@@ -112,6 +112,40 @@ const PREDEFINED_GAMES: PredefinedGame[] = [
   },
 ];
 
+// Predefined messages for Messagerie, grouped by category
+const MESSAGERIE_PRESETS: { category: string; messages: string[] }[] = [
+  {
+    category: "Post-its (Mot de passe)",
+    messages: [
+      "Le mot de passe est écrit quelque part.",
+      "Un petit papier jaune détient la clé.",
+    ],
+  },
+  {
+    category: "Carnet sur bureau",
+    messages: ["Le carnet contient un indice vital."],
+  },
+  {
+    category: "Écrans",
+    messages: [
+      "L'écran s'allume, regarde bien !",
+      "Les instructions changent, dépêche-toi.",
+      "Regardez ARIA, il y a un dilemme à résoudre !",
+    ],
+  },
+  {
+    category: "Posters",
+    messages: [
+      "Regarde les posters sur le mur.",
+      "Il y a des lettres cachées sur les affiches…",
+    ],
+  },
+  {
+    category: "Indices MDP 902",
+    messages: ["Quelle heure est-il ?", "Où sont nos fichiers de données ?"],
+  },
+];
+
 function groupConnectedGames(
   games: ConnectedGame[]
 ): Map<string, ConnectedGame[]> {
@@ -806,6 +840,34 @@ function App() {
                                 : "Message + Entrée"
                             }
                           />
+                        </div>
+                      )}
+
+                      {/* Predefined message presets for Messagerie */}
+                      {activeGroup.baseId === "messagerie" && (
+                        <div className="messagerie-presets">
+                          {MESSAGERIE_PRESETS.map((group) => (
+                            <div
+                              key={group.category}
+                              className="preset-category"
+                            >
+                              <div className="preset-category-label">
+                                {group.category}
+                              </div>
+                              <div className="preset-buttons">
+                                {group.messages.map((msg) => (
+                                  <button
+                                    key={msg}
+                                    className="preset-button"
+                                    onClick={() => setCustomMessage(msg)}
+                                    disabled={isMessageSending}
+                                  >
+                                    {msg}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
 
