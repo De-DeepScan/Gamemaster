@@ -61,14 +61,8 @@ const PRESETS: PresetConfig[] = [
   },
   {
     id: "phase-1-03",
-    label: "Avec plaisir",
-    file: "phase-1-03-avec-plaisir.mp3",
-    phase: 1,
-  },
-  {
-    id: "phase-2",
-    label: "Presentation IA",
-    file: "phase-2-presentation-ia.mp3",
+    label: "Presentation ARIA",
+    file: "phase-1-03-presentation-aria.mp3",
     phase: 1,
   },
   // Phase 2 - Tchat (ancien phase 4)
