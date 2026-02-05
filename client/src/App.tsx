@@ -23,6 +23,9 @@ import { useTTS } from "./hooks/useTTS";
 // Preset index for "Presentation IA" audio
 const PRESENTATION_IA_PRESET_IDX = 3; // phase-2-presentation-ia.mp3
 
+// Preset index for "Presentation IA" audio
+const PRESENTATION_IA_PRESET_IDX = 3; // phase-2-presentation-ia.mp3
+
 type ActionStatus = "idle" | "loading" | "success" | "error";
 
 interface GameAction {
@@ -814,7 +817,7 @@ function App() {
       setTimeout(() => setIsAriaLaunching(false), 2000);
     }
   }, [addEvent]);
-
+  
   // Launch ARIA: triggers audio, animation, password display, and map infection
   const handleLaunchAria = useCallback(async () => {
     setIsAriaLaunching(true);
