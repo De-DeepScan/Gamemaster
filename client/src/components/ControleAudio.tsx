@@ -1340,6 +1340,12 @@ export function ControleAudio({
                 // For Phase 5 preset, call onLaunchAria which plays audio + triggers ARIA/map/password
                 const handlePresetClick = () => {
                   if (preset.id === "phase-5" && onLaunchAria) {
+                    togglePreset(
+                      preset.id,
+                      preset.file,
+                      globalIdx,
+                      preset.ariaAction
+                    );
                     onLaunchAria();
                   } else {
                     // Send message to messagerie if preset has messageToSend (only when starting, not resuming)

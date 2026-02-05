@@ -713,32 +713,27 @@ function App() {
     [sendCommand]
   );
 
-  // Handle Phase 5 (Prise de contrôle) launch - triggers audio, ARIA animation, map infection, and sidequest password screen
+  // Handle Phase 3 (Prise de contrôle) launch - triggers ARIA evil mode, map infection, and sidequest password screen
+  // Audio playback is handled by togglePreset in ControleAudio (called before this)
   const handleLaunchAria = useCallback(async () => {
     setIsAriaLaunching(true);
     addEvent(
       "action",
-      "Lancement Phase 5 - Prise de contrôle",
+      "Lancement Phase 3 - Prise de contrôle",
       undefined,
       "info"
     );
 
-    // 1. Play phase-5 audio (preset index 6 in PRESETS array)
-    socket.emit("audio:play-preset", { presetIdx: 6, file: "phase-5.mp3" });
-
-    // 2. Enable ARIA speaking animation
-    await sendCommand("aria", "enable_speaking");
-
-    // 3. Enable ARIA evil mode
+    // 1. Enable ARIA evil mode
     await sendCommand("aria", "enable_evil");
 
-    // 4. Start map infection
+    // 2. Start map infection
     await sendCommand("infection-map", "start_infection");
 
-    // 5. Show password screen on sidequest (without entering the password)
+    // 3. Show password screen on sidequest (without entering the password)
     await sendCommand("sidequest", "start_screen");
 
-    addEvent("action", "Phase 5 lancée avec succès", undefined, "success");
+    addEvent("action", "Phase 3 lancée avec succès", undefined, "success");
 
     // Reset launching state after a delay
     setTimeout(() => {
