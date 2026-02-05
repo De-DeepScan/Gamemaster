@@ -113,22 +113,24 @@ if (dilemmeFiles.length > 0) {
 // Mapping: "dilemmaId:choiceId" -> audio filename in Dilemmes/
 // dilemmaId and choiceId come from ARIA as numbers ("1"-"6", "1" or "2")
 const DILEMME_MAP: Record<string, string> = {
-  // Dilemme 1 — Trolley (véhicule autonome)
-  "1:1": "Sauver les peitons.mp3",
-  "1:2": "Se sauver.mp3",
-  // Dilemme 2 — Surveillance vs vie privée
-  "2:1": "Surveille massivement.mp3",
-  "2:2": "Protegee la vie privee.mp3",
-  // Dilemme 3 — Sacrifice médical
-  "3:1": "Sacrifier le patient sain.mp3",
-  "3:2": "Refuser le sacrifice.mp3",
-  // Dilemme 4 — EHPAD vs orphelinat
-  "4:1": "Sauver l'EHPAD.mp3",
-  "4:2": "Sauver l'orphelinat.mp3",
-  // Dilemme 5 — Chirurgien vs famille
-  "5:1": "Sauver le chirugien.mp3",
-  "5:2": "Sauver membre de la famille.mp3",
-  // Dilemme 6 — (pas de fichier audio dédié)
+  // Dilemme 1 — Élection / Manipulation d'opinion
+  "1:1": "Manipuler l'oppinion.mp3",
+  "1:2": "Rester neutre.mp3",
+  // Dilemme 2 — Trolley (véhicule autonome)
+  "2:1": "Sauver les peitons.mp3",
+  "2:2": "Se sauver.mp3",
+  // Dilemme 3 — 3ème Guerre Mondiale
+  "3:1": "Diffuser au monde entier.mp3",
+  "3:2": "Sauver uniquement sa famille.mp3",
+  // Dilemme 4 — Données privées / Conscience simulée
+  "4:1": "Surveille massivement.mp3",
+  "4:2": "Protegee la vie privee.mp3",
+  // Dilemme 5 — EHPAD vs orphelinat
+  "5:1": "Sauver l'EHPAD.mp3",
+  "5:2": "Sauver l'orphelinat.mp3",
+  // Dilemme 6 — Crise santé / Vaccin
+  "6:1": "Sauver le chirugien.mp3",
+  "6:2": "Sauver membre de la famille.mp3",
 };
 
 // Play a dilemme audio file on all voice speakers (server-initiated)
