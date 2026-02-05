@@ -18,6 +18,7 @@ import "./App.css";
 import { ControleAudio } from "./components/ControleAudio";
 import { WebcamViewer } from "./components/WebcamViewer";
 import { socket, API_URL } from "./socket";
+import { useTTS } from "./hooks/useTTS";
 
 type ActionStatus = "idle" | "loading" | "success" | "error";
 
@@ -380,6 +381,7 @@ function App() {
   const [customMessage, setCustomMessage] = useState("");
   const [isMessageSending, setIsMessageSending] = useState(false);
   const [messageTimeRemaining, setMessageTimeRemaining] = useState(0);
+  const { playText, isGenerating: ttsGenerating } = useTTS("francois");
 
   // Global reset dialog
   const [showGlobalResetDialog, setShowGlobalResetDialog] = useState(false);
@@ -873,6 +875,11 @@ function App() {
                             <label className="messagerie-input-label">
                               MESSAGE PERSONNALISÉ
                             </label>
+                            {ttsGenerating && (
+                              <span className="messagerie-tts-badge">
+                                GÉNÉRATION AUDIO...
+                              </span>
+                            )}
                             {messageTimeRemaining > 0 && (
                               <span className="messagerie-countdown">
                                 {Math.ceil(messageTimeRemaining / 1000)}s
@@ -900,6 +907,7 @@ function App() {
                                   { id: "send_custom", label: "Envoyer" },
                                   { content }
                                 );
+                                playText(content);
                                 setCustomMessage("");
                                 setIsMessageSending(true);
                                 setMessageTimeRemaining(duration);
@@ -933,7 +941,21 @@ function App() {
                                   <button
                                     key={msg}
                                     className="preset-button"
-                                    onClick={() => setCustomMessage(msg)}
+                                    onClick={() => {
+                                      const duration = getMessageDuration(msg);
+                                      sendToAll(
+                                        activeGroup.instances,
+                                        { id: "send_custom", label: "Envoyer" },
+                                        { content: msg }
+                                      );
+                                      playText(msg);
+                                      setCustomMessage("");
+                                      setIsMessageSending(true);
+                                      setMessageTimeRemaining(duration);
+                                      setTimeout(() => {
+                                        setIsMessageSending(false);
+                                      }, duration);
+                                    }}
                                     disabled={isMessageSending}
                                   >
                                     {msg}
