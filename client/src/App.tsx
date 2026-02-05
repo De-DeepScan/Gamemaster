@@ -473,6 +473,7 @@ function App() {
         prevUsbKey?.status !== "connected"
       ) {
         setActiveTab("infection-map");
+        toast.success("Clé USB connectée");
       }
 
       setGames(data);
