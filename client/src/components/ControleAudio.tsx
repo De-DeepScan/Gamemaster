@@ -134,7 +134,13 @@ const PRESETS: PresetConfig[] = [
     phase: 4,
   },
   // Phase 5 - Finale (ancien phase 7)
-  { id: "finale", label: "Finale", file: "finale.mp3", phase: 5 },
+  {
+    id: "finale",
+    label: "Finale",
+    file: "finale.mp3",
+    phase: 5,
+    ariaAction: "disable_evil",
+  },
 ];
 
 interface AmbientSoundConfig {
