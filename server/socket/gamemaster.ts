@@ -1,5 +1,5 @@
 import type { Server, Socket } from "socket.io";
-import { updateAudioPlayerGameId } from "./audio-relay.js";
+import { updateAudioPlayerGameId, playDilemmeAudio } from "./audio-relay.js";
 
 interface GameAction {
   id: string;
@@ -309,6 +309,14 @@ export function setupGamemaster(io: Server): void {
           console.log(
             `[relay] Dilemma choice: dilemma=${dilemmaId}, choice=${choiceId}`
           );
+
+          // Play ARIA voice for this dilemma choice on all speakers (except JT)
+          const audioPlayed = playDilemmeAudio(io, choiceId);
+          if (!audioPlayed) {
+            console.warn(
+              `[relay] No audio file matched for dilemma choice: ${choiceId}`
+            );
+          }
 
           // Resume Labyrinth (choice is made, game can continue)
           sendCommand(io, "labyrinthe:explorer", "dilemma_end", {});

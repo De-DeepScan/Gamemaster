@@ -1,5 +1,5 @@
 import type { Server, Socket } from "socket.io";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, statSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -94,6 +94,80 @@ function emitAudioLog(
     gameId,
     timestamp: new Date(),
   });
+}
+
+// Scan Dilemmes directory for available audio files
+const dilemmeDir = path.join(__dirname, "..", "audio", "presets", "Dilemmes");
+const dilemmeFiles = existsSync(dilemmeDir)
+  ? readdirSync(dilemmeDir).filter((f: string) => f.endsWith(".mp3"))
+  : [];
+
+if (dilemmeFiles.length > 0) {
+  console.log(
+    `[audio-relay] Dilemme audio files: ${dilemmeFiles.map((f: string) => f.replace(".mp3", "")).join(", ")}`
+  );
+}
+
+// Play a dilemme audio file on all voice speakers (server-initiated)
+export function playDilemmeAudio(io: Server, choiceId: string): boolean {
+  // Try to find a matching file by choiceId
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const normalizedChoice = normalize(choiceId);
+
+  let matchedFile: string | null = null;
+  for (const file of dilemmeFiles) {
+    const name = file.replace(".mp3", "");
+    if (name === choiceId || normalize(name) === normalizedChoice) {
+      matchedFile = file;
+      break;
+    }
+  }
+
+  // Partial match fallback
+  if (!matchedFile) {
+    for (const file of dilemmeFiles) {
+      const name = normalize(file.replace(".mp3", ""));
+      if (name.includes(normalizedChoice) || normalizedChoice.includes(name)) {
+        matchedFile = file;
+        break;
+      }
+    }
+  }
+
+  if (!matchedFile) {
+    console.warn(
+      `[audio-relay] No dilemme audio for choiceId="${choiceId}". Available: ${dilemmeFiles.map((f: string) => f.replace(".mp3", "")).join(", ")}`
+    );
+    return false;
+  }
+
+  const relativePath = `Dilemmes/${matchedFile}`;
+  const fullPath = path.join(__dirname, "..", "audio", "presets", relativePath);
+
+  if (!existsSync(fullPath)) {
+    console.error(`[audio-relay] Dilemme file missing: ${fullPath}`);
+    return false;
+  }
+
+  const fileSizeKB = Math.round(statSync(fullPath).size / 1024);
+  console.log(
+    `[audio-relay] Playing dilemme: "${matchedFile}" (${fileSizeKB}KB) for choiceId="${choiceId}"`
+  );
+
+  io.to("audio-players:voice").emit("audio:play-preset", {
+    presetIdx: -1,
+    file: relativePath,
+  });
+
+  io.emit("audio:log", {
+    type: "preset",
+    action: "play",
+    message: `Dilemme "${matchedFile}" → voix`,
+    timestamp: new Date(),
+  });
+
+  return true;
 }
 
 export function setupAudioRelay(io: Server) {
