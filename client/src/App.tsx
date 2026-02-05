@@ -843,6 +843,8 @@ function App() {
         usbKeyConnected={usbKeyConnected}
         onLaunchAria={handleLaunchAria}
         isAriaLaunching={isAriaLaunching}
+        onLaunchAria={handleLaunchAria}
+        isAriaLaunching={isAriaLaunching}
       />
       <aside className="webcam-sidebar">
         <WebcamViewer />
