@@ -466,6 +466,61 @@ export function ControleAudio({
   const [editingVolumeId, setEditingVolumeId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  // Fade transitions infrastructure
+  const fadeIntervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(
+    new Map()
+  );
+  const skipNextPhaseSyncRef = useRef(false);
+
+  const fadeSocket = useCallback(
+    (
+      key: string,
+      event: string,
+      payloadFn: (volume: number) => Record<string, unknown>,
+      from: number,
+      to: number,
+      durationMs: number,
+      onComplete?: () => void
+    ) => {
+      const existing = fadeIntervalsRef.current.get(key);
+      if (existing) clearInterval(existing);
+
+      if (durationMs <= 0 || Math.abs(to - from) < 0.005) {
+        socket.emit(event, payloadFn(to));
+        onComplete?.();
+        return;
+      }
+
+      const steps = Math.max(1, Math.round(durationMs / 30));
+      const stepMs = durationMs / steps;
+      const delta = (to - from) / steps;
+      let step = 0;
+
+      const interval = setInterval(() => {
+        step++;
+        const vol = step >= steps ? to : from + delta * step;
+        socket.emit(event, payloadFn(vol));
+
+        if (step >= steps) {
+          clearInterval(interval);
+          fadeIntervalsRef.current.delete(key);
+          onComplete?.();
+        }
+      }, stepMs);
+
+      fadeIntervalsRef.current.set(key, interval);
+    },
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      for (const interval of fadeIntervalsRef.current.values()) {
+        clearInterval(interval);
+      }
+    };
+  }, []);
+
   // Load saved voice on mount
   useEffect(() => {
     const stored = localStorage.getItem("escape_voices");
@@ -480,6 +535,10 @@ export function ControleAudio({
 
   // Sync volumes to audio players when phase changes (or on mount)
   useEffect(() => {
+    if (skipNextPhaseSyncRef.current) {
+      skipNextPhaseSyncRef.current = false;
+      return;
+    }
     socket.emit("audio:volume-ia", { volume: iaVolume });
 
     // Re-apply ambient master to all active sounds
@@ -600,6 +659,13 @@ export function ControleAudio({
   // Handle volume changes
   const handleIaVolume = useCallback(
     (volume: number) => {
+      // Cancel any active IA fade
+      const existing = fadeIntervalsRef.current.get("__ia__");
+      if (existing) {
+        clearInterval(existing);
+        fadeIntervalsRef.current.delete("__ia__");
+      }
+
       setVolumesByPhase((prev) => ({
         ...prev,
         [selectedPhase]: {
@@ -615,6 +681,14 @@ export function ControleAudio({
 
   const handleAmbientMaster = useCallback(
     (volume: number) => {
+      // Cancel any active ambient fades
+      for (const [key, interval] of fadeIntervalsRef.current) {
+        if (key.startsWith("ambient-")) {
+          clearInterval(interval);
+          fadeIntervalsRef.current.delete(key);
+        }
+      }
+
       setVolumesByPhase((prev) => ({
         ...prev,
         [selectedPhase]: {
@@ -831,11 +905,12 @@ export function ControleAudio({
     return audioPlayers.some((p) => p.gameId === gameId);
   };
 
-  // Switch phase: compare states and only change what's different
+  // Switch phase: crossfade ambient sounds and IA volume
   const switchPhase = useCallback(
     (targetPhase: number) => {
       if (targetPhase === selectedPhase) return;
 
+      const FADE_MS = 800;
       const currentStates = ambientByPhase[selectedPhase] ?? {};
       const targetStates = ambientByPhase[targetPhase] ?? {};
       const currentAmbientMaster =
@@ -843,63 +918,110 @@ export function ControleAudio({
       const targetAmbientMaster =
         volumesByPhase[targetPhase]?.ambientMaster ?? 0.5;
 
-      // Compare states for each sound and only change what's different
+      // Crossfade ambient sounds between phases
       for (const sound of AMBIENT_SOUNDS) {
         const currentState = currentStates[sound.id];
         const targetState = targetStates[sound.id];
         const wasActive = currentState?.active ?? false;
         const willBeActive = targetState?.active ?? false;
-        const currentVolume = currentState?.volume ?? 0.1;
-        const targetVolume = targetState?.volume ?? 0.1;
+        const currentEffective =
+          (currentState?.volume ?? 0.1) * currentAmbientMaster;
+        const targetEffective =
+          (targetState?.volume ?? 0.1) * targetAmbientMaster;
 
         if (wasActive && !willBeActive) {
-          // Sound was active, now inactive -> stop
-          socket.emit("audio:stop-ambient", { soundId: sound.id });
+          // Fade out then stop
+          fadeSocket(
+            `ambient-${sound.id}`,
+            "audio:set-ambient-volume",
+            (v) => ({ soundId: sound.id, volume: v }),
+            currentEffective,
+            0,
+            FADE_MS,
+            () => socket.emit("audio:stop-ambient", { soundId: sound.id })
+          );
         } else if (!wasActive && willBeActive) {
-          // Sound was inactive, now active -> start
+          // Start at volume 0, then fade in
           socket.emit("audio:play-ambient", {
             soundId: sound.id,
             file: sound.file,
-            volume: targetVolume * targetAmbientMaster,
+            volume: 0,
           });
+          setTimeout(() => {
+            fadeSocket(
+              `ambient-${sound.id}`,
+              "audio:set-ambient-volume",
+              (v) => ({ soundId: sound.id, volume: v }),
+              0,
+              targetEffective,
+              FADE_MS
+            );
+          }, 50);
         } else if (wasActive && willBeActive) {
-          // Sound active in both phases - check if effective volume changed
-          const currentEffective = currentVolume * currentAmbientMaster;
-          const targetEffective = targetVolume * targetAmbientMaster;
+          // Crossfade volume if different
           if (Math.abs(currentEffective - targetEffective) > 0.01) {
-            socket.emit("audio:set-ambient-volume", {
-              soundId: sound.id,
-              volume: targetEffective,
-            });
+            fadeSocket(
+              `ambient-${sound.id}`,
+              "audio:set-ambient-volume",
+              (v) => ({ soundId: sound.id, volume: v }),
+              currentEffective,
+              targetEffective,
+              FADE_MS
+            );
           }
-          // Else: same sound, same volume -> do nothing (sound continues)
         }
       }
 
+      // Fade IA volume between phases
+      const currentIa = volumesByPhase[selectedPhase]?.ia ?? 0.5;
+      const targetIa = volumesByPhase[targetPhase]?.ia ?? 0.5;
+      if (Math.abs(currentIa - targetIa) > 0.01) {
+        fadeSocket(
+          "__ia__",
+          "audio:volume-ia",
+          (v) => ({ volume: v }),
+          currentIa,
+          targetIa,
+          FADE_MS
+        );
+      } else {
+        socket.emit("audio:volume-ia", { volume: targetIa });
+      }
+
+      skipNextPhaseSyncRef.current = true;
       setSelectedPhase(targetPhase);
     },
-    [selectedPhase, ambientByPhase, volumesByPhase]
+    [selectedPhase, ambientByPhase, volumesByPhase, fadeSocket]
   );
 
-  // Start phase 1 sounds from stopped state (after global reset)
+  // Start phase 1 sounds from stopped state (after global reset) with fade in
   const startPhase1Sounds = useCallback(() => {
+    const FADE_MS = 600;
     const phase1States = ambientByPhase[1] ?? {};
     const phase1AmbientMaster = volumesByPhase[1]?.ambientMaster ?? 0.5;
 
     for (const sound of AMBIENT_SOUNDS) {
       const state = phase1States[sound.id];
       if (state?.active) {
+        const targetVol = (state.volume ?? 0.1) * phase1AmbientMaster;
         socket.emit("audio:play-ambient", {
           soundId: sound.id,
           file: sound.file,
-          volume: (state.volume ?? 0.1) * phase1AmbientMaster,
+          volume: 0,
         });
+        setTimeout(() => {
+          fadeSocket(
+            `ambient-${sound.id}`,
+            "audio:set-ambient-volume",
+            (v) => ({ soundId: sound.id, volume: v }),
+            0,
+            targetVol,
+            FADE_MS
+          );
+        }, 50);
       }
     }
-
-    // Sync local state
-    setAmbientStates(phase1States);
-  }, [ambientByPhase, volumesByPhase]);
+  }, [ambientByPhase, volumesByPhase, fadeSocket]);
 
   // Listen for global reset (audio:stop-all) to reset phases and restart phase 1 sounds
   useEffect(() => {
@@ -921,35 +1043,65 @@ export function ControleAudio({
     };
   }, [startPhase1Sounds]);
 
-  // Toggle ambient sound
+  // Toggle ambient sound with fade in/out
   const toggleAmbient = useCallback(
     (sound: AmbientSoundConfig) => {
       const state = ambientStates[sound.id];
+      const FADE_MS = 400;
+
       if (state?.active) {
-        socket.emit("audio:stop-ambient", { soundId: sound.id });
+        const currentVol = (state.volume ?? 0.1) * ambientMaster;
+        // Fade out then stop
+        fadeSocket(
+          `ambient-${sound.id}`,
+          "audio:set-ambient-volume",
+          (v) => ({ soundId: sound.id, volume: v }),
+          currentVol,
+          0,
+          FADE_MS,
+          () => socket.emit("audio:stop-ambient", { soundId: sound.id })
+        );
         setAmbientStates((prev) => ({
           ...prev,
           [sound.id]: { ...prev[sound.id], active: false },
         }));
       } else {
         const vol = state?.volume ?? 0.1;
+        const targetVol = vol * ambientMaster;
+        // Start at volume 0, then fade in
         socket.emit("audio:play-ambient", {
           soundId: sound.id,
           file: sound.file,
-          volume: vol * ambientMaster,
+          volume: 0,
         });
+        setTimeout(() => {
+          fadeSocket(
+            `ambient-${sound.id}`,
+            "audio:set-ambient-volume",
+            (v) => ({ soundId: sound.id, volume: v }),
+            0,
+            targetVol,
+            FADE_MS
+          );
+        }, 50);
         setAmbientStates((prev) => ({
           ...prev,
           [sound.id]: { active: true, volume: vol },
         }));
       }
     },
-    [ambientStates, setAmbientStates, ambientMaster]
+    [ambientStates, setAmbientStates, ambientMaster, fadeSocket]
   );
 
-  // Change ambient volume
+  // Change ambient volume (cancel any active fade for this sound)
   const changeAmbientVolume = useCallback(
     (sound: AmbientSoundConfig, volume: number) => {
+      const existing = fadeIntervalsRef.current.get(`ambient-${sound.id}`);
+      if (existing) {
+        clearInterval(existing);
+        fadeIntervalsRef.current.delete(`ambient-${sound.id}`);
+      }
+
       setAmbientStates((prev) => ({
         ...prev,
         [sound.id]: { active: prev[sound.id]?.active ?? false, volume },
@@ -962,6 +1114,33 @@ export function ControleAudio({
       }
     },
     [ambientStates, setAmbientStates, ambientMaster]
+  );
+
+  // Change ambient volume with fade (for percentage input jumps)
+  const changeAmbientVolumeSmooth = useCallback(
+    (sound: AmbientSoundConfig, newVolume: number) => {
+      const currentVolume = ambientStates[sound.id]?.volume ?? 0.1;
+
+      setAmbientStates((prev) => ({
+        ...prev,
+        [sound.id]: {
+          active: prev[sound.id]?.active ?? false,
+          volume: newVolume,
+        },
+      }));
+
+      if (ambientStates[sound.id]?.active) {
+        fadeSocket(
+          `ambient-${sound.id}`,
+          "audio:set-ambient-volume",
+          (v) => ({ soundId: sound.id, volume: v }),
+          currentVolume * ambientMaster,
+          newVolume * ambientMaster,
+          300
+        );
+      }
+    },
+    [ambientStates, setAmbientStates, ambientMaster, fadeSocket]
   );
 
   // Get presets for selected phase
@@ -1228,7 +1407,7 @@ export function ControleAudio({
                               0,
                               Math.min(100, parseInt(editValue) || 0)
                             );
-                            changeAmbientVolume(sound, val / 100);
+                            changeAmbientVolumeSmooth(sound, val / 100);
                             setEditingVolumeId(null);
                           } else if (e.key === "Escape") {
                             setEditingVolumeId(null);
@@ -1239,7 +1418,7 @@ export function ControleAudio({
                             0,
                             Math.min(100, parseInt(editValue) || 0)
                           );
-                          changeAmbientVolume(sound, val / 100);
+                          changeAmbientVolumeSmooth(sound, val / 100);
                           setEditingVolumeId(null);
                         }}
                       />
