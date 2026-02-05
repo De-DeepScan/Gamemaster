@@ -585,6 +585,12 @@ export function ControleAudio({
     }
   }, [selectedPhase]);
 
+  // Sync John volume on mount
+  useEffect(() => {
+    socket.emit("audio:volume-john", { volume: johnVolume });
+    lastEmittedRef.current.set("__john__", johnVolume);
+  }, []);
+
   // Persist per-phase data
   useEffect(() => {
     localStorage.setItem("sc_volumes_by_phase", JSON.stringify(volumesByPhase));
