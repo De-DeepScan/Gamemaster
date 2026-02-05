@@ -3,6 +3,7 @@ import {
   useState,
   useCallback,
   useMemo,
+  useRef,
   type ChangeEvent,
   type KeyboardEvent,
 } from "react";
@@ -403,6 +404,7 @@ function App() {
     new URLSearchParams(window.location.search).get("view") === "cams";
 
   const [games, setGames] = useState<ConnectedGame[]>([]);
+  const gamesRef = useRef<ConnectedGame[]>([]);
   const [connected, setConnected] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, ActionStatus>>({});
@@ -480,7 +482,7 @@ function App() {
 
     socket.on("games_updated", (data: ConnectedGame[]) => {
       // Log new connections/disconnections
-      const prevGames = games;
+      const prevGames = gamesRef.current;
       data.forEach((game) => {
         const prevGame = prevGames.find((g) => g.gameId === game.gameId);
         if (!prevGame && game.status === "connected") {
@@ -526,6 +528,7 @@ function App() {
         toast.success("Clé USB connectée");
       }
 
+      gamesRef.current = data;
       setGames(data);
     });
 
@@ -556,7 +559,10 @@ function App() {
 
     fetch(`${API_URL}/api/games`)
       .then((r) => r.json())
-      .then(setGames)
+      .then((data) => {
+        gamesRef.current = data;
+        setGames(data);
+      })
       .catch(() => {});
 
     return () => {
@@ -567,7 +573,7 @@ function App() {
       socket.off("audio-status-updated");
       socket.off("audio:log");
     };
-  }, [addEvent, games]);
+  }, [addEvent]);
 
   const groups = useMemo(() => mergeWithPredefined(games), [games]);
   const usbKeyConnected = games.some(
