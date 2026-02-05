@@ -579,11 +579,11 @@ export function ControleAudio({
     }
   }, [selectedPhase]);
 
-  // Sync John volume on mount
+  // Sync John volume on mount and when new audio players connect
   useEffect(() => {
     socket.emit("audio:volume-john", { volume: johnVolume });
     lastEmittedRef.current.set("__john__", johnVolume);
-  }, []);
+  }, [audioPlayers.length]);
 
   // Persist per-phase data
   useEffect(() => {
