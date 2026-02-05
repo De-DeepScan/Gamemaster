@@ -1589,29 +1589,34 @@
 
 /* Messagerie Presets */
 .messagerie-presets {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-lg);
   margin-bottom: var(--space-lg);
 }
 
 .preset-category {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  background: rgba(0, 255, 255, 0.03);
+  border: 1px solid rgba(0, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 14px;
 }
 
 .preset-category-label {
-  font-size: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
-  opacity: 0.5;
-  color: var(--color-primary);
+  color: #fff;
+  margin-bottom: 4px;
 }
 
 .preset-buttons {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
 }
 
@@ -1621,11 +1626,13 @@
   border-radius: 4px;
   color: var(--color-text);
   font-family: var(--font-primary);
-  font-size: var(--text-xs);
-  padding: 6px 12px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 10px 16px;
   cursor: pointer;
   transition: all 0.15s;
   text-align: left;
+  width: 100%;
 }
 
 .preset-button:hover {
