@@ -307,6 +307,9 @@ export function setupAudioRelay(io: Server) {
 
       // Notify ARIA to show speaking animation
       io.emit("aria:speaking-state", { speaking: true });
+
+      // Notify ARIA to show speaking animation
+      io.emit("aria:speaking-state", { speaking: true });
     });
 
     // Voice events → audio-players:voice (excludes JT/mappemonde)
