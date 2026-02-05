@@ -20,6 +20,9 @@ import { WebcamViewer } from "./components/WebcamViewer";
 import { socket, API_URL } from "./socket";
 import { useTTS } from "./hooks/useTTS";
 
+// Preset index for "Presentation IA" audio
+const PRESENTATION_IA_PRESET_IDX = 3; // phase-2-presentation-ia.mp3
+
 type ActionStatus = "idle" | "loading" | "success" | "error";
 
 interface GameAction {
@@ -403,6 +406,7 @@ function App() {
   const [customMessage, setCustomMessage] = useState("");
   const [isMessageSending, setIsMessageSending] = useState(false);
   const [messageTimeRemaining, setMessageTimeRemaining] = useState(0);
+  const [isAriaLaunching, setIsAriaLaunching] = useState(false);
   const { playText, isGenerating: ttsGenerating } = useTTS("john");
 
   // Global reset dialog
@@ -759,6 +763,50 @@ function App() {
     });
   }, []);
 
+  // Launch ARIA: triggers audio, animation, password display, and map infection
+  const handleLaunchAria = useCallback(async () => {
+    setIsAriaLaunching(true);
+    addEvent("action", "Lancement ARIA en cours...", undefined, "info");
+
+    try {
+      // 1. Play presentation IA audio
+      socket.emit("audio:play-preset", {
+        presetIdx: PRESENTATION_IA_PRESET_IDX,
+        file: "phase-2-presentation-ia.mp3",
+      });
+
+      // 2. Send commands to all games in parallel
+      const commands = [
+        // ARIA: start intro animation
+        fetch(`${API_URL}/api/games/aria/command`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "start_intro", payload: {} }),
+        }),
+        // Sidequest: show password screen
+        fetch(`${API_URL}/api/games/sidequest/command`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "start_screen", payload: {} }),
+        }),
+        // Infection Map: start infection
+        fetch(`${API_URL}/api/games/infection-map/command`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "start_infection", payload: {} }),
+        }),
+      ];
+
+      await Promise.allSettled(commands);
+      addEvent("action", "Lancement ARIA réussi", undefined, "success");
+    } catch (error) {
+      console.error("Launch ARIA error:", error);
+      addEvent("action", "Erreur lors du lancement ARIA", undefined, "error");
+    } finally {
+      setTimeout(() => setIsAriaLaunching(false), 2000);
+    }
+  }, [addEvent]);
+
   // Global reset: reset all games and audio
   const handleGlobalReset = useCallback(async () => {
     // Reset all connected games that have a reset action
@@ -814,6 +862,8 @@ function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         usbKeyConnected={usbKeyConnected}
+        onLaunchAria={handleLaunchAria}
+        isAriaLaunching={isAriaLaunching}
       />
       <aside className="webcam-sidebar">
         <WebcamViewer />
