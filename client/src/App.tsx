@@ -105,6 +105,11 @@ const PREDEFINED_GAMES: PredefinedGame[] = [
     displayName: "Messagerie",
     expectedInstances: [{ gameId: "messagerie", name: "Messagerie" }],
   },
+  {
+    baseId: "usb-key",
+    displayName: "Clé USB",
+    expectedInstances: [{ gameId: "usb-key", name: "Clé USB" }],
+  },
 ];
 
 function groupConnectedGames(
@@ -421,6 +426,17 @@ function App() {
           );
         }
       });
+
+      // Auto-switch to infection-map tab when USB key connects
+      const usbKey = data.find((g) => g.gameId === "usb-key");
+      const prevUsbKey = prevGames.find((g) => g.gameId === "usb-key");
+      if (
+        usbKey?.status === "connected" &&
+        prevUsbKey?.status !== "connected"
+      ) {
+        setActiveTab("infection-map");
+      }
+
       setGames(data);
     });
 
@@ -458,6 +474,9 @@ function App() {
   }, [addEvent, games]);
 
   const groups = useMemo(() => mergeWithPredefined(games), [games]);
+  const usbKeyConnected = games.some(
+    (g) => g.gameId === "usb-key" && g.status === "connected"
+  );
 
   useEffect(() => {
     // Don't auto-switch if we're on sound_control or webcam tab
@@ -649,6 +668,7 @@ function App() {
         connected={connected}
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        usbKeyConnected={usbKeyConnected}
       />
       <EventTimeline events={events} />
 

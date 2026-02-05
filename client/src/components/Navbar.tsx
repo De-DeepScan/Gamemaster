@@ -11,6 +11,7 @@ interface NavbarProps {
   connected: boolean;
   activeTab: string | null;
   onTabChange: (baseId: string) => void;
+  usbKeyConnected: boolean;
 }
 
 export function Navbar({
@@ -18,6 +19,7 @@ export function Navbar({
   connected,
   activeTab,
   onTabChange,
+  usbKeyConnected,
 }: NavbarProps) {
   return (
     <nav className="navbar">
@@ -116,25 +118,27 @@ export function Navbar({
 
       {/* Game status blocks - now clickable */}
       <div className="navbar-center">
-        {groups.map((group) => {
-          const connectedCount = group.instances.filter(
-            (i) => i.status === "connected"
-          ).length;
-          const isActive = activeTab === group.baseId;
-          return (
-            <button
-              key={group.baseId}
-              className={`game-status-block ${group.groupStatus} ${isActive ? "active" : ""}`}
-              onClick={() => onTabChange(group.baseId)}
-            >
-              <span className={`status-dot ${group.groupStatus}`} />
-              <span className="game-name">{group.displayName}</span>
-              <span className="game-count">
-                {connectedCount}/{group.expectedInstances.length}
-              </span>
-            </button>
-          );
-        })}
+        {groups
+          .filter((g) => g.baseId !== "usb-key")
+          .map((group) => {
+            const connectedCount = group.instances.filter(
+              (i) => i.status === "connected"
+            ).length;
+            const isActive = activeTab === group.baseId;
+            return (
+              <button
+                key={group.baseId}
+                className={`game-status-block ${group.groupStatus} ${isActive ? "active" : ""}`}
+                onClick={() => onTabChange(group.baseId)}
+              >
+                <span className={`status-dot ${group.groupStatus}`} />
+                <span className="game-name">{group.displayName}</span>
+                <span className="game-count">
+                  {connectedCount}/{group.expectedInstances.length}
+                </span>
+              </button>
+            );
+          })}
 
         {/* Controle Audio Tab */}
         <button
@@ -155,8 +159,15 @@ export function Navbar({
         </button>
       </div>
 
-      {/* Server connection badge */}
+      {/* USB key + Server connection badges */}
       <div className="navbar-right">
+        <div
+          className={`server-badge ${usbKeyConnected ? "online" : "offline"}`}
+          title={usbKeyConnected ? "Clé USB connectée" : "Clé USB déconnectée"}
+        >
+          <span className="server-dot" />
+          USB
+        </div>
         <div className={`server-badge ${connected ? "online" : "offline"}`}>
           <span className="server-dot" />
           {connected ? "Serveur" : "Déconnecté"}

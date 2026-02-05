@@ -33,6 +33,7 @@ const expectedGames: ExpectedGame[] = [
   { gameId: "labyrinthe", name: "Labyrinthe - Protecteur", role: "protector" },
   { gameId: "infection-map", name: "Carte Infection" },
   { gameId: "messagerie", name: "Messagerie" },
+  { gameId: "usb-key", name: "Clé USB" },
 ];
 
 // Key = "gameId:role" or "gameId" if no role
@@ -153,6 +154,18 @@ export function setupGamemaster(io: Server): void {
         );
 
         io.emit("games_updated", getConnectedGames());
+
+        // Auto-trigger victory when USB key connects
+        if (data.gameId === "usb-key") {
+          console.log(
+            "[automation] USB key connected, triggering player victory..."
+          );
+          setTimeout(() => {
+            sendCommand(io, "labyrinthe:explorer", "show_identity_card");
+            sendCommand(io, "labyrinthe:protector", "show_identity_card");
+            sendCommand(io, "infection-map", "player_victory");
+          }, 1000);
+        }
       }
     );
 
